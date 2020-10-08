@@ -21,7 +21,6 @@ package org.appenders.log4j2.elasticsearch.bulkprocessor;
  */
 
 
-import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.ConfigurationException;
 import org.apache.logging.log4j.core.config.Node;
 import org.apache.logging.log4j.core.config.plugins.Plugin;
@@ -29,7 +28,6 @@ import org.apache.logging.log4j.core.config.plugins.PluginBuilderAttribute;
 import org.apache.logging.log4j.core.config.plugins.PluginBuilderFactory;
 import org.apache.logging.log4j.core.config.plugins.PluginElement;
 import org.apache.logging.log4j.core.config.plugins.validation.constraints.Required;
-import org.apache.logging.log4j.status.StatusLogger;
 import org.appenders.log4j2.elasticsearch.Auth;
 import org.appenders.log4j2.elasticsearch.BatchOperations;
 import org.appenders.log4j2.elasticsearch.ClientObjectFactory;
@@ -54,22 +52,28 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.function.Function;
 
+import static org.appenders.core.logging.InternalLogging.getLogger;
+
 @Plugin(name = BulkProcessorObjectFactory.PLUGIN_NAME, category = Node.CATEGORY, elementType = ClientObjectFactory.ELEMENT_TYPE, printObject = true)
 public class BulkProcessorObjectFactory implements ClientObjectFactory<TransportClient, BulkRequest> {
 
     static final String PLUGIN_NAME = "ElasticsearchBulkProcessor";
 
-    private static Logger LOG = StatusLogger.getLogger();
-
     private final Collection<String> serverUris;
     private final UriParser uriParser = new UriParser();
     private final Auth auth;
+    private final ClientSettings clientSettings;
 
     private TransportClient client;
 
     protected BulkProcessorObjectFactory(Collection<String> serverUris, Auth auth) {
+        this(serverUris, auth, new ClientSettings.Builder().build());
+    }
+
+    protected BulkProcessorObjectFactory(Collection<String> serverUris, Auth auth, ClientSettings clientSettings) {
         this.serverUris = serverUris;
         this.auth = auth;
+        this.clientSettings = clientSettings;
     }
 
     @Override
@@ -97,7 +101,7 @@ public class BulkProcessorObjectFactory implements ClientObjectFactory<Transport
 
     // visible for testing
     ClientProvider<TransportClient> getClientProvider() {
-        return auth == null ? new InsecureTransportClientProvider() : new SecureClientProvider(auth);
+        return auth == null ? new InsecureTransportClientProvider(clientSettings) : new SecureClientProvider(auth, clientSettings);
     }
 
     @Override
@@ -143,7 +147,7 @@ public class BulkProcessorObjectFactory implements ClientObjectFactory<Transport
         try {
             operation.execute();
         } catch (Exception e) {
-            LOG.error("Operation failed: {}", e.getMessage());
+            getLogger().error("Operation failed: {}", e.getMessage());
         }
     }
 
@@ -154,6 +158,8 @@ public class BulkProcessorObjectFactory implements ClientObjectFactory<Transport
 
     public static class Builder implements org.apache.logging.log4j.core.util.Builder<BulkProcessorObjectFactory> {
 
+        public static final ClientSettings DEFAULT_CLIENT_SETTINGS = ClientSettings.newBuilder().build();
+
         @PluginBuilderAttribute
         @Required(message = "No serverUris provided for " + PLUGIN_NAME)
         private String serverUris;
@@ -161,12 +167,15 @@ public class BulkProcessorObjectFactory implements ClientObjectFactory<Transport
         @PluginElement("auth")
         private Auth auth;
 
+        @PluginElement(ClientSettings.ELEMENT_TYPE)
+        private ClientSettings clientSettings = DEFAULT_CLIENT_SETTINGS;
+
         @Override
         public BulkProcessorObjectFactory build() {
             if (serverUris == null) {
                 throw new ConfigurationException("No serverUris provided for " + PLUGIN_NAME);
             }
-            return new BulkProcessorObjectFactory(Arrays.asList(serverUris.split(";")), auth);
+            return new BulkProcessorObjectFactory(Arrays.asList(serverUris.split(";")), auth, clientSettings);
         }
 
         public Builder withServerUris(String serverUris) {
@@ -178,13 +187,33 @@ public class BulkProcessorObjectFactory implements ClientObjectFactory<Transport
             this.auth = auth;
             return this;
         }
+
+        public Builder withClientSettings(ClientSettings clientSettings) {
+            this.clientSettings = clientSettings;
+            return this;
+        }
+
     }
 
     static class InsecureTransportClientProvider implements ClientProvider<TransportClient> {
 
+        private final ClientSettings clientSettings;
+
+        InsecureTransportClientProvider() {
+            this.clientSettings = Builder.DEFAULT_CLIENT_SETTINGS;
+        }
+
+        InsecureTransportClientProvider(ClientSettings clientSettings) {
+            this.clientSettings = clientSettings;
+        }
+
         @Override
         public TransportClient createClient() {
-            return new PreBuiltTransportClient(Settings.Builder.EMPTY_SETTINGS, Collections.EMPTY_LIST);
+
+            Settings.Builder settingsBuilder = Settings.builder();
+            this.clientSettings.applyTo(settingsBuilder);
+
+            return new PreBuiltTransportClient(settingsBuilder.build(), Collections.EMPTY_LIST);
         }
 
     }

@@ -22,13 +22,13 @@ package org.appenders.log4j2.elasticsearch.hc;
 
 import com.fasterxml.jackson.databind.ObjectReader;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 import org.apache.logging.log4j.core.config.ConfigurationException;
 import org.appenders.log4j2.elasticsearch.Auth;
 import org.appenders.log4j2.elasticsearch.BatchOperations;
-import org.appenders.log4j2.elasticsearch.ByteBufItemSource;
+import org.appenders.log4j2.elasticsearch.ByteBufItemSourceTest;
 import org.appenders.log4j2.elasticsearch.ClientObjectFactory;
 import org.appenders.log4j2.elasticsearch.ClientProvider;
-import org.appenders.log4j2.elasticsearch.failover.FailedItemSource;
 import org.appenders.log4j2.elasticsearch.FailoverPolicy;
 import org.appenders.log4j2.elasticsearch.ItemSource;
 import org.appenders.log4j2.elasticsearch.LifeCycle;
@@ -37,7 +37,7 @@ import org.appenders.log4j2.elasticsearch.Operation;
 import org.appenders.log4j2.elasticsearch.PooledItemSourceFactory;
 import org.appenders.log4j2.elasticsearch.PooledItemSourceFactoryTest;
 import org.appenders.log4j2.elasticsearch.backoff.BackoffPolicy;
-import org.appenders.log4j2.elasticsearch.backoff.NoopBackoffPolicy;
+import org.appenders.log4j2.elasticsearch.failover.FailedItemSource;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -52,7 +52,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
-import static org.appenders.log4j2.elasticsearch.GenericItemSourcePoolTest.byteBufAllocator;
+import static org.appenders.log4j2.elasticsearch.ByteBufItemSourceTest.createTestItemSource;
 import static org.appenders.log4j2.elasticsearch.hc.BatchRequestTest.createTestBatch;
 import static org.appenders.log4j2.elasticsearch.mock.LifecycleTestHelper.falseOnlyOnce;
 import static org.appenders.log4j2.elasticsearch.mock.LifecycleTestHelper.trueOnlyOnce;
@@ -60,8 +60,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.never;
@@ -612,11 +612,9 @@ public class HCHttpTest {
     }
 
     private ItemSource<ByteBuf> createDefaultTestBuffereItemSource(String payload) {
-        ByteBuf buffer = byteBufAllocator.buffer(16);
+        CompositeByteBuf buffer = ByteBufItemSourceTest.createDefaultTestByteBuf();
         buffer.writeBytes(payload.getBytes());
-        return new ByteBufItemSource(buffer, source -> {
-            // noop
-        });
+        return createTestItemSource(buffer, source -> {});
     }
 
     @Test

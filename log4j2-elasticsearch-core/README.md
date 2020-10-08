@@ -8,7 +8,7 @@ To use it, add this XML snippet to your `pom.xml` file:
 <dependency>
     <groupId>org.appenders.log4j</groupId>
     <artifactId>log4j2-elasticsearch-core</artifactId>
-    <version>1.3.6</version>
+    <version>1.4.4</version>
 </dependency>
 ```
 
@@ -69,8 +69,8 @@ Since 1.1, rolling index can be defined using `RollingIndexName` tag:
 <Appenders>
     <Elasticsearch name="elasticsearchAsyncBatch">
         ...
-        <!-- zone is optional. OS timezone is used by default -->
-        <RollingIndexName indexName="log4j2" pattern="yyyy-MM-dd" timeZone="Europe/Warsaw" />
+        <!-- zone is optional. OS timezone is used by default. separator is optional, - (hyphen, dash) is used by default. -->
+        <RollingIndexName indexName="log4j2" pattern="yyyy-MM-dd" timeZone="Europe/Warsaw" separator="." />
         ...
     </Elasticsearch>
 </Appenders>
@@ -112,6 +112,8 @@ or
 </Appenders>
 ```
 
+Since 1.4.2, template can include variables resolvable with [Log4j2 Lookups](https://logging.apache.org/log4j/2.x/manual/lookups.html) or progammatically provided [ValueResolver](https://github.com/rfoltyns/log4j2-elasticsearch/blob/master/log4j2-elasticsearch-core/src/main/java/org/appenders/log4j2/elasticsearch/ValueResolver.java). See examples: [index template](https://github.com/rfoltyns/log4j2-elasticsearch/blob/master/log4j2-elasticsearch-hc/src/test/resources/indexTemplate-7.json), [ValueResolver](https://github.com/rfoltyns/log4j2-elasticsearch/blob/master/log4j2-elasticsearch-hc/src/test/java/org/appenders/log4j2/elasticsearch/hc/smoke/SmokeTest.java)
+
 NOTE: Be aware that template parsing errors on cluster side MAY NOT prevent plugin from loading - error is logged on client side and startup continues.
 
 ### Message output
@@ -131,6 +133,7 @@ Furthermore, [ItemSource API](#itemsource-api) allows to use pooled [ByteByfItem
 Config property | Type | Required | Default | Description
 ------------ | ------------- | ------------- | ------------- | -------------
 afterburner | Attribute | no | false | if `true`, `com.fasterxml.jackson.module:jackson-module-afterburner` will be used to optimize (de)serialization. Since this dependency is in `provided` scope by default, it MUST be declared explicitly.
+singleThread | Attribute | no | false | Use ONLY with `AsyncLogger`. If `true`, `com.fasterxml.jackson.core.JsonFactory` will be replaced with [SingleThreadJsonFactory](https://github.com/rfoltyns/log4j2-elasticsearch/blob/master/log4j2-elasticsearch-core/src/main/java/org/appenders/log4j2/elasticsearch/SingleThreadJsonFactory.java) for `LogEvent` serialization. Offers slightly better serialization throughput.
 mixins | Element(s) | no | None | Array of `JacksonMixIn` elements. Can be used to override default serialization of LogEvent, Message and related objects
 virtualProperties (since 1.4) | Element(s) | no | None | Array of `VirtualProperty` elements. Similar to `KeyValuePair`, can be used to define properties resolvable on the fly, not available in LogEvent(s).
 itemSourceFactory | Element | yes (since 1.4) | n/a | `ItemSourceFactory` used to create wrappers for serialized items. `StringItemSourceFactory` and `PooledItemSourceFactory` are available
@@ -180,6 +183,38 @@ value | Attribute | yes | n/a | Static value or contextual variable resolvable w
 dynamic | Attribute | no | false | if `true`, indicates that value may change over time and should be resolved on every serialization (see [Log4j2Lookup](https://github.com/rfoltyns/log4j2-elasticsearch/blob/master/log4j2-elasticsearch-core/src/main/java/org/appenders/log4j2/elasticsearch/Log4j2Lookup.java)). Otherwise, will be resolved only on startup.
 
 Custom lookup can implemented with [ValueResolver](https://github.com/rfoltyns/log4j2-elasticsearch/blob/master/log4j2-elasticsearch-core/src/main/java/org/appenders/log4j2/elasticsearch/ValueResolver.java).
+
+##### Virtual Property Filters
+
+Since 1.4.3, implementations of [`VirtualPropertyFilter`](https://github.com/rfoltyns/log4j2-elasticsearch/blob/master/log4j2-elasticsearch-core/src/main/java/org/appenders/log4j2/elasticsearch/VirtualPropertyFilter.java) can be configured to include or exclude `VirtualProperty` by name and/or value resolved by [Log4j2Lookup](https://github.com/rfoltyns/log4j2-elasticsearch/blob/master/log4j2-elasticsearch-core/src/main/java/org/appenders/log4j2/elasticsearch/Log4j2Lookup.java) (or custom [ValueResolver](https://github.com/rfoltyns/log4j2-elasticsearch/blob/master/log4j2-elasticsearch-core/src/main/java/org/appenders/log4j2/elasticsearch/ValueResolver.java)).
+
+Available filters:
+
+* `NonEmptyFilter` - excludes `VirtualProperty` is resolved value is `null` or empty (doesn't exclude blank)
+
+Custom filtering can be implemented with [`VirtualPropertyFilter`](https://github.com/rfoltyns/log4j2-elasticsearch/blob/master/log4j2-elasticsearch-core/src/main/java/org/appenders/log4j2/elasticsearch/VirtualPropertyFilter.java).
+
+Example:
+```xml
+<Elasticsearch name="elasticsearchAsyncBatch">
+    ...
+    <JacksonJsonLayout afterburner="true">
+        <!-- will be included because it's resolved to "undefined" -->
+        <VirtualProperty name="hostname" value="$${env:hostname:-undefined}" />
+        <!-- will be included if envVariable is not available on startup because it's resolved to "${env:envVariable}" -->
+        <VirtualProperty name="field1" value="${env:envVariable}" />
+        <!-- will NOT be included if envVariable is not available on startup because it's resolved to "" -->
+        <VirtualProperty name="field2" value="${env:envVariable:-}" />
+        <!-- order doesn't matter -->
+        <NonEmptyFilter/>
+        <!-- will NOT be included if envVariable is not available on startup because it's resolved to "" -->
+        <VirtualProperty name="field3" value="$${env:envVariable:-}" />
+        <!-- will NOT be included if ctxVariable is not available in runtime -->
+        <VirtualProperty name="field4" value="$${ctx:ctxVariable:-}" dynamic="true" />
+    </JacksonJsonLayout>
+    ...
+</Elasticsearch>
+```
 
 #### Log4j2 JsonLayout
 `JsonLayout` will serialize LogEvent using Jackson mapper configured in log4j-core. Custom `org.apache.logging.log4j.core.Layout` can be provided to appender config to use any other serialization mechanism.
@@ -233,8 +268,6 @@ Redirects failed batches to configured `org.apache.logging.log4j.core.Appender`.
 Config property | Type | Required | Default | Description
 ------------ | ------------- | ------------- | ------------- | -------------
 appenderRef | Attribute | yes | n/a | Name of appender available in current configuration
-
-:warning: This policy will NOT work with [object pooling](#object-pooling). Only String-based items are allowed ([StringItemSource](https://github.com/rfoltyns/log4j2-elasticsearch/blob/master/log4j2-elasticsearch-core/src/main/java/org/appenders/log4j2/elasticsearch/StringItemSource.java)).
 
 Example:
 ```xml

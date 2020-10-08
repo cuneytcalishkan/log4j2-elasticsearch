@@ -3,7 +3,7 @@
     <groupId>org.appenders.log4j</groupId>
     <artifactId>parent</artifactId>
     <packaging>pom</packaging>
-    <version>1.4.1-SNAPSHOT</version>
+    <version>1.5.0-SNAPSHOT</version>
     <name>appenders.org Parent</name>
     <description>appenders.org Parent POM</description>
 
@@ -48,12 +48,13 @@
         <java.version>1.8</java.version>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <log4j2.version>2.11.1</log4j2.version>
+        <log4j2.version>2.13.3</log4j2.version>
         <jacoco.version>0.8.3</jacoco.version>
-        <jackson.version>2.9.8</jackson.version>
+        <jackson.version>2.11.0</jackson.version>
         <httpclient.version>4.5.11</httpclient.version>
         <httpasyncclient.version>4.1.4</httpasyncclient.version>
         <httpcore.version>4.4.13</httpcore.version>
+        <net.openhft.chroniclemap.version>3.19.40</net.openhft.chroniclemap.version>
     </properties>
 
     <modules>
@@ -129,7 +130,6 @@
                 <artifactId>jackson-module-afterburner</artifactId>
                 <version>${jackson.version}</version>
             </dependency>
-
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpclient</artifactId>
@@ -151,6 +151,12 @@
                 <version>${httpcore.version}</version>
             </dependency>
 
+            <dependency>
+                <groupId>net.openhft</groupId>
+                <artifactId>chronicle-map</artifactId>
+                <version>${net.openhft.chroniclemap.version}</version>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 
@@ -166,6 +172,32 @@
     <build>
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>3.2.0</version>
+                    <executions>
+                        <execution>
+                            <id>attach-sources</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>jar-no-fork</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>3.2.0</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>test-jar</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
                 <plugin>
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>

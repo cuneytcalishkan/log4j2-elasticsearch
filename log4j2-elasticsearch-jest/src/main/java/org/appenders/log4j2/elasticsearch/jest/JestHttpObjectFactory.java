@@ -34,7 +34,6 @@ import io.searchbox.core.Index;
 import io.searchbox.core.JestBatchIntrospector;
 import io.searchbox.indices.template.PutTemplate;
 import io.searchbox.indices.template.TemplateAction;
-import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.ConfigurationException;
 import org.apache.logging.log4j.core.config.Node;
 import org.apache.logging.log4j.core.config.plugins.Plugin;
@@ -42,7 +41,6 @@ import org.apache.logging.log4j.core.config.plugins.PluginBuilderAttribute;
 import org.apache.logging.log4j.core.config.plugins.PluginBuilderFactory;
 import org.apache.logging.log4j.core.config.plugins.PluginElement;
 import org.apache.logging.log4j.core.config.plugins.validation.constraints.Required;
-import org.apache.logging.log4j.status.StatusLogger;
 import org.appenders.log4j2.elasticsearch.Auth;
 import org.appenders.log4j2.elasticsearch.BatchOperations;
 import org.appenders.log4j2.elasticsearch.ClientObjectFactory;
@@ -62,12 +60,11 @@ import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Function;
 
+import static org.appenders.core.logging.InternalLogging.getLogger;
 import static org.appenders.log4j2.elasticsearch.jest.JestBulkOperations.DEFAULT_MAPPING_TYPE;
 
 @Plugin(name = "JestHttp", category = Node.CATEGORY, elementType = ClientObjectFactory.ELEMENT_TYPE, printObject = true)
 public class JestHttpObjectFactory implements ClientObjectFactory<JestClient, Bulk> {
-
-    private static Logger LOG = StatusLogger.getLogger();
 
     private volatile State state = State.STOPPED;
 
@@ -87,75 +84,6 @@ public class JestHttpObjectFactory implements ClientObjectFactory<JestClient, Bu
     protected FailedItemOps<AbstractDocumentTargetedAction<DocumentResult>> failedItemOps;
 
     private JestClient client;
-
-    /**
-     * This constructor is deprecated and will be removed in 1.5.
-     * Use {@link #JestHttpObjectFactory(Collection, int, int, int, int, int, boolean, Auth, String, BackoffPolicy)} instead.
-     *
-     * @param serverUris List of semicolon-separated `http[s]://host:[port]` addresses of Elasticsearch nodes to connect with. Unless `discoveryEnabled=true`, this will be the final list of available nodes
-     * @param connTimeout Number of milliseconds before ConnectException is thrown while attempting to connect
-     * @param readTimeout Number of milliseconds before SocketTimeoutException is thrown while waiting for response bytes
-     * @param maxTotalConnections Number of connections available
-     * @param defaultMaxTotalConnectionPerRoute Number of connections available per Apache CPool
-     * @param discoveryEnabled If `true`, `io.searchbox.client.config.discovery.NodeChecker` will use `serverUris` to auto-discover Elasticsearch nodes. Otherwise, `serverUris` will be the final list of available nodes
-     * @param auth Security configuration
-     * @deprecated As of 1.5, this constructor wil be removed. Use {@link #JestHttpObjectFactory(Builder)} instead.
-     *
-     */
-    @Deprecated
-    protected JestHttpObjectFactory(Collection<String> serverUris,
-                                    int connTimeout,
-                                    int readTimeout,
-                                    int maxTotalConnections,
-                                    int defaultMaxTotalConnectionPerRoute,
-                                    boolean discoveryEnabled,
-                                    Auth<io.searchbox.client.config.HttpClientConfig.Builder> auth) {
-        this(serverUris,
-                connTimeout,
-                readTimeout,
-                maxTotalConnections,
-                defaultMaxTotalConnectionPerRoute,
-                Runtime.getRuntime().availableProcessors(),
-                discoveryEnabled,
-                auth,
-                DEFAULT_MAPPING_TYPE,
-                new NoopBackoffPolicy<>());
-    }
-
-    /**
-     * @param serverUris List of semicolon-separated `http[s]://host:[port]` addresses of Elasticsearch nodes to connect with. Unless `discoveryEnabled=true`, this will be the final list of available nodes
-     * @param connTimeout Number of milliseconds before ConnectException is thrown while attempting to connect
-     * @param readTimeout Number of milliseconds before SocketTimeoutException is thrown while waiting for response bytes
-     * @param maxTotalConnections Number of connections available
-     * @param defaultMaxTotalConnectionPerRoute Number of connections available per Apache CPool
-     * @param discoveryEnabled If `true`, `io.searchbox.client.config.discovery.NodeChecker` will use `serverUris` to auto-discover Elasticsearch nodes. Otherwise, `serverUris` will be the final list of available nodes
-     * @param ioThreadCount number of 'I/O Dispatcher' threads started by Apache HC `IOReactor`
-     * @param auth Security configuration
-     * @param mappingType Elasticsearch mapping type name. MAY be set to '_doc' for Elasticsearch 7.x compatibility
-     * @deprecated As of 1.5, this constructor will be removed. Use {@link #JestHttpObjectFactory(Builder)} instead
-     */
-    @Deprecated
-    protected JestHttpObjectFactory(Collection<String> serverUris,
-                                    int connTimeout,
-                                    int readTimeout,
-                                    int maxTotalConnections,
-                                    int defaultMaxTotalConnectionPerRoute,
-                                    int ioThreadCount,
-                                    boolean discoveryEnabled,
-                                    Auth<io.searchbox.client.config.HttpClientConfig.Builder> auth,
-                                    String mappingType,
-                                    BackoffPolicy backoffPolicy) {
-        this.serverUris = serverUris;
-        this.connTimeout = connTimeout;
-        this.readTimeout = readTimeout;
-        this.maxTotalConnections = maxTotalConnections;
-        this.defaultMaxTotalConnectionsPerRoute = defaultMaxTotalConnectionPerRoute;
-        this.ioThreadCount = ioThreadCount;
-        this.discoveryEnabled = discoveryEnabled;
-        this.auth = auth;
-        this.mappingType = mappingType;
-        this.backoffPolicy = backoffPolicy;
-    }
 
     protected JestHttpObjectFactory(Builder builder) {
         this.serverUris = Arrays.asList(builder.serverUris.split(";"));
@@ -215,12 +143,12 @@ public class JestHttpObjectFactory implements ClientObjectFactory<JestClient, Bu
                         operations.remove().execute();
                     } catch (Exception e) {
                         // TODO: redirect to failover (?) retry with exp. backoff (?) multiple options here
-                        LOG.error("Deferred operation failed: {}", e.getMessage());
+                        getLogger().error("Deferred operation failed: {}", e.getMessage());
                     }
                 }
 
                 if (backoffPolicy.shouldApply(bulk)) {
-                    LOG.warn("Backoff applied. Request rejected.");
+                    getLogger().warn("Backoff applied. Request rejected.");
                     failureHandler.apply(bulk);
                     return false;
                 } else {
@@ -246,7 +174,7 @@ public class JestHttpObjectFactory implements ClientObjectFactory<JestClient, Bu
 
                 Collection items = introspector.items(bulk);
 
-                LOG.warn(String.format("Batch of %s items failed. Redirecting to %s",
+                getLogger().warn(String.format("Batch of %s items failed. Redirecting to %s",
                         items.size(),
                         failover.getClass().getName()));
 
@@ -272,10 +200,10 @@ public class JestHttpObjectFactory implements ClientObjectFactory<JestClient, Bu
         try {
             JestResult result = createClient().execute(templateAction);
             if (!result.isSucceeded()) {
-                LOG.error("IndexTemplate not added: " + result.getErrorMessage());
+                getLogger().error("IndexTemplate not added: " + result.getErrorMessage());
             }
         } catch (IOException e) {
-            LOG.error("IndexTemplate not added: " + e.getMessage());
+            getLogger().error("IndexTemplate not added: " + e.getMessage());
         }
     }
 
@@ -292,13 +220,13 @@ public class JestHttpObjectFactory implements ClientObjectFactory<JestClient, Bu
                 backoffPolicy.deregister(bulk);
 
                 if (!result.isSucceeded()) {
-                    LOG.warn(result.getErrorMessage());
+                    getLogger().warn(result.getErrorMessage());
                     failureHandler.apply(bulk);
                 }
             }
             @Override
             public void failed(Exception ex) {
-                LOG.warn(ex.getMessage(), ex);
+                getLogger().warn(ex.getMessage(), ex);
                 backoffPolicy.deregister(bulk);
                 failureHandler.apply(bulk);
             }
@@ -463,14 +391,14 @@ public class JestHttpObjectFactory implements ClientObjectFactory<JestClient, Bu
             return;
         }
 
-        LOG.debug("Stopping {}", getClass().getSimpleName());
+        getLogger().debug("Stopping {}", getClass().getSimpleName());
 
         if (client != null) {
             client.shutdownClient();
         }
         state = State.STOPPED;
 
-        LOG.debug("{} stopped", getClass().getSimpleName());
+        getLogger().debug("{} stopped", getClass().getSimpleName());
 
     }
 

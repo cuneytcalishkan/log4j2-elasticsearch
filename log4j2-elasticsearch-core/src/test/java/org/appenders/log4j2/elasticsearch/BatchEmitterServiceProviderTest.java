@@ -30,7 +30,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
-import org.mockito.Matchers;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.powermock.api.mockito.PowerMockito;
@@ -45,6 +45,7 @@ import static org.appenders.log4j2.elasticsearch.AppenderRefFailoverPolicyTest.c
 import static org.appenders.log4j2.elasticsearch.BatchDeliveryTest.createTestObjectFactoryBuilder;
 import static org.appenders.log4j2.elasticsearch.BulkEmitterTest.LARGE_TEST_INTERVAL;
 import static org.appenders.log4j2.elasticsearch.BulkEmitterTest.TEST_BATCH_SIZE;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.powermock.api.mockito.PowerMockito.spy;
@@ -66,7 +67,7 @@ public class BatchEmitterServiceProviderTest {
     public void setUp()
     {
         PowerMockito.mockStatic(ServiceLoader.class);
-        Mockito.when(ServiceLoader.load(Mockito.any(Class.class))).thenReturn(mockServiceLoader);
+        Mockito.when(ServiceLoader.load(any(Class.class), any(ClassLoader.class))).thenReturn(mockServiceLoader);
     }
 
     @Test
@@ -124,14 +125,13 @@ public class BatchEmitterServiceProviderTest {
 
         when(mockServiceLoader.iterator()).thenReturn(iterator);
 
-        when(emitterFactory.accepts(Matchers.<Class<TestHttpObjectFactory>>any())).thenReturn(false);
+        when(emitterFactory.accepts(ArgumentMatchers.<Class<TestHttpObjectFactory>>any())).thenReturn(false);
 
         expectedException.expect(ConfigurationException.class);
         expectedException.expectMessage("No compatible BatchEmitter implementations");
 
         // when
         createWithTestValues(serviceProvider);
-
 
     }
 

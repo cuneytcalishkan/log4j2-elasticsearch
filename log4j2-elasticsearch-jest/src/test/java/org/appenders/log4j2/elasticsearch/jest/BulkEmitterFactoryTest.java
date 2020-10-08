@@ -28,7 +28,7 @@ import org.mockito.Mockito;
 
 import static org.appenders.log4j2.elasticsearch.jest.JestHttpObjectFactoryTest.createTestObjectFactoryBuilder;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.spy;
 
 public class BulkEmitterFactoryTest {
@@ -54,7 +54,7 @@ public class BulkEmitterFactoryTest {
         BatchEmitterFactory emitterFactory = new BulkEmitterFactory();
 
         // when
-        boolean result = emitterFactory.accepts(TestBulkProcessorObjectFactory.class);
+        boolean result = emitterFactory.accepts(TestClientObjectFactory.class);
 
         // then
         assertTrue(result);
@@ -91,9 +91,9 @@ public class BulkEmitterFactoryTest {
 
     }
 
-    public static class TestBulkProcessorObjectFactory extends JestHttpObjectFactory {
-        protected TestBulkProcessorObjectFactory() {
-            super(null, 0, 0, 0, 0, false, null);
+    public static class TestClientObjectFactory extends JestHttpObjectFactory {
+        protected TestClientObjectFactory() {
+            super(JestHttpObjectFactoryTest.createTestObjectFactoryBuilder());
         }
     }
 }

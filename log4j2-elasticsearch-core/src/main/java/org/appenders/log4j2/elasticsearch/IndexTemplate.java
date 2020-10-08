@@ -21,19 +21,16 @@ package org.appenders.log4j2.elasticsearch;
  */
 
 
+import org.apache.logging.log4j.core.config.Configuration;
 import org.apache.logging.log4j.core.config.ConfigurationException;
 import org.apache.logging.log4j.core.config.Node;
 import org.apache.logging.log4j.core.config.plugins.Plugin;
 import org.apache.logging.log4j.core.config.plugins.PluginAttribute;
 import org.apache.logging.log4j.core.config.plugins.PluginBuilderFactory;
+import org.apache.logging.log4j.core.config.plugins.PluginConfiguration;
 import org.apache.logging.log4j.core.config.plugins.PluginValue;
 import org.apache.logging.log4j.core.config.plugins.validation.constraints.Required;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
 @Plugin(name = IndexTemplate.PLUGIN_NAME, category = Node.CATEGORY, elementType = IndexTemplate.ELEMENT_TYPE, printObject = true)
 public class IndexTemplate {
@@ -41,8 +38,8 @@ public class IndexTemplate {
     public static final String PLUGIN_NAME = "IndexTemplate";
     public static final String ELEMENT_TYPE = "indexTemplate";
 
-    private String name;
-    private String source;
+    private final String name;
+    private final String source;
 
     protected IndexTemplate(String name, String source) {
         this.name = name;
@@ -75,6 +72,21 @@ public class IndexTemplate {
         @PluginValue("sourceString")
         private String source;
 
+        /**
+         * @deprecated Added temporarily, solely to support variables in programmatic config.
+         * Will be removed when SetupOps API is added.
+         */
+        @Deprecated
+        @PluginConfiguration
+        private Configuration configuration;
+
+        /**
+         * @deprecated Added temporarily, solely to support variables in programmatic config.
+         * Will be removed when SetupOps API is added.
+         */
+        @Deprecated
+        private ValueResolver valueResolver;
+
         @Override
         public IndexTemplate build() {
             if (name == null) {
@@ -83,7 +95,26 @@ public class IndexTemplate {
             if ((path == null && source == null) || (path != null && source != null)) {
                 throw new ConfigurationException("Either path or source have to be provided for IndexTemplate");
             }
-            return new IndexTemplate(name, loadSource());
+
+            return new IndexTemplate(name, getValueResolver().resolve(loadSource()));
+        }
+
+        /* visible for testing */
+        @Deprecated
+        ValueResolver getValueResolver() {
+
+            // allow programmatic override
+            if (valueResolver != null) {
+                return valueResolver;
+            }
+
+            // handle XML config
+            if (configuration != null) {
+                return new Log4j2Lookup(configuration.getStrSubstitutor());
+            }
+
+            // fallback to no-op
+            return ValueResolver.NO_OP;
         }
 
         private String loadSource() {
@@ -92,11 +123,7 @@ public class IndexTemplate {
                 return source;
             }
 
-            if (path.contains(CLASSPATH_PREFIX)) {
-                return loadClasspathResource();
-            }
-
-            return loadFileSystemResource();
+            return ResourceUtil.loadResource(path);
 
         }
 
@@ -115,30 +142,29 @@ public class IndexTemplate {
             return this;
         }
 
-        private String loadClasspathResource() {
-            try {
-                BufferedReader br = new BufferedReader(new InputStreamReader(
-                        ClassLoader.getSystemClassLoader().getResourceAsStream(
-                                path.replace(CLASSPATH_PREFIX, "")),
-                        "UTF-8"));
-                StringBuilder sb = new StringBuilder();
-                String line;
-                while ((line = br.readLine()) != null) {
-                    sb.append(line);
-                    sb.append('\n');
-                }
-                return sb.toString();
-            } catch (Exception e) {
-                throw new ConfigurationException(e.getMessage(), e);
-            }
+        /**
+         * @param configuration Log4j2 StrSubstitutor provider
+         * @return this
+         *
+         * @deprecated Added temporarily, solely to support variables in programmatic config.
+         * Will be removed when SetupOps API is added.
+         */
+        Builder withConfiguration(Configuration configuration) {
+            this.configuration = configuration;
+            return this;
         }
 
-        private String loadFileSystemResource() {
-            try {
-                return new String(Files.readAllBytes(Paths.get(path)));
-            } catch (IOException e){
-                throw new ConfigurationException(e.getMessage(), e);
-            }
+        /**
+         * @param valueResolver variable resolver
+         * @return this
+         *
+         * @deprecated Added temporarily, solely to support variables in programmatic config.
+         * Will be removed when SetupOps API is added.
+         */
+        @Deprecated
+        public Builder withValueResolver(ValueResolver valueResolver) {
+            this.valueResolver = valueResolver;
+            return this;
         }
 
     }

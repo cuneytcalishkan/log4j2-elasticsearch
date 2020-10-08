@@ -35,8 +35,6 @@ import net.openhft.chronicle.hash.serialization.BytesReader;
 import net.openhft.chronicle.hash.serialization.BytesWriter;
 import net.openhft.chronicle.wire.WireIn;
 import net.openhft.chronicle.wire.WireOut;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.status.StatusLogger;
 import org.appenders.log4j2.elasticsearch.ByteBufItemSource;
 import org.appenders.log4j2.elasticsearch.ExtendedObjectMapper;
 import org.appenders.log4j2.elasticsearch.ItemSource;
@@ -45,12 +43,10 @@ import org.appenders.log4j2.elasticsearch.StringItemSource;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.IOException;
+import static org.appenders.core.logging.InternalLogging.getLogger;
 
 public class FailedItemMarshaller implements BytesWriter<ItemSource>, BytesReader<ItemSource>,
         ReadResolvable<FailedItemMarshaller> {
-
-    private static final Logger LOG = StatusLogger.getLogger();
 
     private ObjectMapper objectMapper;
 
@@ -111,7 +107,7 @@ public class FailedItemMarshaller implements BytesWriter<ItemSource>, BytesReade
         try {
             return objectMapper.readValue(in.inputStream(), ItemSource.class);
         } catch (Exception e) {
-            LOG.error(
+            getLogger().error(
                     "{} deserialization failed: {}. Returning null..",
                     FailedItemSource.class.getSimpleName(),
                     e.getMessage()
@@ -125,7 +121,7 @@ public class FailedItemMarshaller implements BytesWriter<ItemSource>, BytesReade
         try {
             objectMapper.writeValue(out.outputStream(), toWrite);
         } catch (Exception e) {
-            LOG.error(
+            getLogger().error(
                     "{} serialization failed: {}",
                     FailedItemSource.class.getSimpleName(),
                     e.getMessage()

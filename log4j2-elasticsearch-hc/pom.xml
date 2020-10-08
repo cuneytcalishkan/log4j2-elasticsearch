@@ -3,7 +3,7 @@
     <parent>
         <artifactId>parent</artifactId>
         <groupId>org.appenders.log4j</groupId>
-        <version>1.4.1-SNAPSHOT</version>
+        <version>1.5.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <artifactId>log4j2-elasticsearch-hc</artifactId>
@@ -86,7 +86,6 @@
         <dependency>
             <groupId>net.openhft</groupId>
             <artifactId>chronicle-map</artifactId>
-            <version>3.17.0</version>
             <scope>provided</scope>
         </dependency>
 
@@ -106,13 +105,19 @@
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
-            <artifactId>mockito-all</artifactId>
-            <version>1.10.19</version>
+            <artifactId>mockito-core</artifactId>
+            <version>2.18.0</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
 
     <build>
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+                <filtering>false</filtering>
+            </testResource>
+        </testResources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -129,9 +134,30 @@
                         <jksCertInfo.keystorePassword>password</jksCertInfo.keystorePassword>
                         <jksCertInfo.truststorePath>${project.build.testOutputDirectory}/jks/truststore.jks</jksCertInfo.truststorePath>
                         <jksCertInfo.truststorePassword>password</jksCertInfo.truststorePassword>
+                        <indexTemplate.indexPatterns>log4j2*</indexTemplate.indexPatterns>
+                        <indexTemplate.settings.index.refreshInterval>5s</indexTemplate.settings.index.refreshInterval>
+                        <smokeTest.batchSize>10000</smokeTest.batchSize>
+                        <smokeTest.initialBatchPoolSize>4</smokeTest.initialBatchPoolSize>
+                        <smokeTest.initialItemPoolSize>40000</smokeTest.initialItemPoolSize>
+                        <smokeTest.initialItemBufferSizeInBytes>1024</smokeTest.initialItemBufferSizeInBytes>
+                        <smokeTest.limitPerSec>10000</smokeTest.limitPerSec>
                         <buildDirectory>${project.build.directory}</buildDirectory>
                     </systemPropertyVariables>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

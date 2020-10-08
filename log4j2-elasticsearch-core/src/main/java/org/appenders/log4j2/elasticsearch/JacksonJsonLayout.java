@@ -109,8 +109,14 @@ public class JacksonJsonLayout extends AbstractLayout<ItemSource> implements Ite
         @PluginElement("VirtualProperty")
         private VirtualProperty[] virtualProperties = new VirtualProperty[0];
 
+        @PluginElement("VirtualPropertyFilter")
+        private VirtualPropertyFilter[] virtualPropertyFilters = new VirtualPropertyFilter[0];
+
         @PluginBuilderAttribute("afterburner")
         private boolean useAfterburner;
+
+        @PluginBuilderAttribute("singleThread")
+        private boolean singleThread;
 
         @Override
         public JacksonJsonLayout build() {
@@ -140,16 +146,19 @@ public class JacksonJsonLayout extends AbstractLayout<ItemSource> implements Ite
                 objectMapper.addMixIn(mixin.getTargetClass(), mixin.getMixInClass());
             }
 
+            ValueResolver valueResolver = createValueResolver();
+
             for (VirtualProperty property : virtualProperties) {
                 if (!property.isDynamic()) {
-                    property.setValue(createValueResolver().resolve(property.getValue()));
+                    property.setValue(valueResolver.resolve(property.getValue()));
                 }
             }
 
             SerializationConfig customConfig = objectMapper.getSerializationConfig()
                     .with(new JacksonHandlerInstantiator(
                             virtualProperties,
-                            createValueResolver()
+                            valueResolver,
+                            virtualPropertyFilters
                     ));
 
             objectMapper.setConfig(customConfig);
@@ -166,9 +175,16 @@ public class JacksonJsonLayout extends AbstractLayout<ItemSource> implements Ite
         }
 
         protected ObjectMapper createDefaultObjectMapper() {
-            return new ExtendedObjectMapper(new JsonFactory())
+            return new ExtendedObjectMapper(createJsonFactory())
                     .setSerializationInclusion(JsonInclude.Include.NON_EMPTY)
                     .configure(SerializationFeature.CLOSE_CLOSEABLE, false);
+        }
+
+        protected JsonFactory createJsonFactory() {
+            if (singleThread) {
+                return new SingleThreadJsonFactory();
+            }
+            return new JsonFactory();
         }
 
         /**
@@ -210,6 +226,17 @@ public class JacksonJsonLayout extends AbstractLayout<ItemSource> implements Ite
         }
 
         /**
+         * Allows to define inclusion/exclusion filters for {@link VirtualProperty}-ies.
+         *
+         * @param virtualPropertyFilters filters to be applied to each configured {@link VirtualProperty}
+         * @return this
+         */
+        public Builder withVirtualPropertyFilters(VirtualPropertyFilter[] virtualPropertyFilters) {
+            this.virtualPropertyFilters = virtualPropertyFilters;
+            return this;
+        }
+
+        /**
          * Allows to configure {@link AfterburnerModule} - (de)serialization optimizer
          *
          * @param useAfterburner if true, {@link AfterburnerModule} will be used, false otherwise
@@ -217,6 +244,21 @@ public class JacksonJsonLayout extends AbstractLayout<ItemSource> implements Ite
          */
         public Builder withAfterburner(boolean useAfterburner) {
             this.useAfterburner = useAfterburner;
+            return this;
+        }
+
+        /**
+         * Allows to configure {@link SingleThreadJsonFactory}
+         *
+         * NOTE: Use ONLY when {@link JacksonJsonLayout#serialize(LogEvent)}/{@link JacksonJsonLayout#serialize(Message)}
+         * are called exclusively by a one thread at a time, e.g. with AsyncLogger
+         *
+         * @param singleThread if true, {@link SingleThreadJsonFactory} will be used to create serializers,
+         *                    otherwise {@code com.fasterxml.jackson.core.JsonFactory} will be used
+         * @return this
+         */
+        public Builder withSingleThread(boolean singleThread) {
+            this.singleThread = singleThread;
             return this;
         }
     }

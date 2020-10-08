@@ -23,14 +23,12 @@ package org.appenders.log4j2.elasticsearch.failover;
 import net.openhft.chronicle.hash.ChronicleHashCorruption;
 import net.openhft.chronicle.map.ChronicleMap;
 import net.openhft.chronicle.map.ChronicleMapBuilder;
-import org.apache.logging.log4j.core.Appender;
 import org.apache.logging.log4j.core.config.ConfigurationException;
 import org.apache.logging.log4j.core.config.Node;
 import org.apache.logging.log4j.core.config.plugins.Plugin;
 import org.apache.logging.log4j.core.config.plugins.PluginBuilderAttribute;
 import org.apache.logging.log4j.core.config.plugins.PluginBuilderFactory;
 import org.apache.logging.log4j.core.config.plugins.PluginElement;
-import org.apache.logging.log4j.status.StatusLogger;
 import org.appenders.log4j2.elasticsearch.DelayedShutdown;
 import org.appenders.log4j2.elasticsearch.FailoverPolicy;
 import org.appenders.log4j2.elasticsearch.ItemSource;
@@ -51,20 +49,20 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
+import static org.appenders.core.logging.InternalLogging.getLogger;
+
 /**
  * Uses Chronicle-Map (https://github.com/OpenHFT/Chronicle-Map) to store failed items.
  * Uses {@link RetryProcessor} to retry failed items.
  */
-@Plugin(name = ChronicleMapRetryFailoverPolicy.PLUGIN_NAME, category = Node.CATEGORY, elementType = Appender.ELEMENT_TYPE, printObject = true)
-public class ChronicleMapRetryFailoverPolicy implements FailoverPolicy<ItemSource>, LifeCycle {
+@Plugin(name = ChronicleMapRetryFailoverPolicy.PLUGIN_NAME, category = Node.CATEGORY, elementType = FailoverPolicy.ELEMENT_TYPE, printObject = true)
+public class ChronicleMapRetryFailoverPolicy implements FailoverPolicy<FailedItemSource>, LifeCycle {
 
     public static final String PLUGIN_NAME = "ChronicleMapRetryFailoverPolicy";
 
-    private static final StatusLogger LOGGER = StatusLogger.getLogger();
-
     private volatile State state = State.STOPPED;
 
-    private final ChronicleMap<CharSequence, ItemSource> failedItems;
+    private final MapProxy<CharSequence, ItemSource> failedItems;
     private final KeySequenceSelector keySequenceSelector;
     private final Supplier<KeySequence> keySequenceSupplier;
 
@@ -91,7 +89,7 @@ public class ChronicleMapRetryFailoverPolicy implements FailoverPolicy<ItemSourc
      * @param builder config
      */
     protected ChronicleMapRetryFailoverPolicy(Builder builder) {
-        this.failedItems = builder.chronicleMap;
+        this.failedItems = builder.mapProxy;
         this.keySequenceSelector = builder.keySequenceSelector;
         this.keySequenceSupplier = keySequenceSelector.currentKeySequence();
         this.batchSize = builder.batchSize;
@@ -121,7 +119,7 @@ public class ChronicleMapRetryFailoverPolicy implements FailoverPolicy<ItemSourc
      * @param failedItemSource failed item
      */
     @Override
-    public void deliver(ItemSource failedItemSource) {
+    public void deliver(FailedItemSource failedItemSource) {
         CharSequence key = keySequenceSupplier.get().nextWriterKey();
         tryPut(key, failedItemSource);
     }
@@ -145,7 +143,7 @@ public class ChronicleMapRetryFailoverPolicy implements FailoverPolicy<ItemSourc
         } catch (Exception e) {
             // TODO: add to metrics
             storeFailureCount.incrementAndGet();
-            LOGGER.error("Unable to store {}. Cause: {}", failedItem.getClass().getSimpleName(), e.getMessage());
+            getLogger().error("Unable to store {}. Cause: {}", failedItem.getClass().getSimpleName(), e.getMessage());
             return false;
         }
 
@@ -178,13 +176,13 @@ public class ChronicleMapRetryFailoverPolicy implements FailoverPolicy<ItemSourc
 
     DelayedShutdown delayedShutdown() {
         return new DelayedShutdown(() -> executors.forEach(ExecutorService::shutdown))
-                .onDecrement(remaining -> LOGGER.warn("{} ms before proceeding", remaining))
+                .onDecrement(remaining -> getLogger().warn("{} ms before proceeding", remaining))
                 .afterDelay(() -> {
 
                     int totalKeys = failedItems.size();
                     long enqueuedKeys = keySequenceSelector.currentKeySequence().get().readerKeysAvailable();
 
-                    LOGGER.info(
+                    getLogger().info(
                             "sequenceId: {}, total: {}, enqueued: {}",
                             keySequenceSelector.currentKeySequence().get().getConfig(true).getSeqId(),
                             totalKeys,
@@ -224,7 +222,7 @@ public class ChronicleMapRetryFailoverPolicy implements FailoverPolicy<ItemSourc
 
         /**
          * Default entry size: 1024 bytes
-         * <p/>
+         * <br>
          * NOTE: Suitable for small logs (~300 characters)
          * )
          */
@@ -265,7 +263,7 @@ public class ChronicleMapRetryFailoverPolicy implements FailoverPolicy<ItemSourc
         @PluginBuilderAttribute(value = "monitorTaskInterval")
         protected long monitorTaskInterval = DEFAULT_RETRY_DELAY;
 
-        private ChronicleMap<CharSequence, ItemSource> chronicleMap;
+        private MapProxy<CharSequence, ItemSource> mapProxy;
 
         @Override
         public final ChronicleMapRetryFailoverPolicy build() {
@@ -294,7 +292,7 @@ public class ChronicleMapRetryFailoverPolicy implements FailoverPolicy<ItemSourc
             }
 
             try {
-                this.chronicleMap = createChronicleMap();
+                this.mapProxy = new ChronicleMapProxy(createChronicleMap());
                 this.keySequenceSelector = configuredKeySequenceSelector();
             } catch (Exception e) {
                 throw new ConfigurationException("Could not initialize " +
@@ -307,7 +305,7 @@ public class ChronicleMapRetryFailoverPolicy implements FailoverPolicy<ItemSourc
 
         protected KeySequenceSelector configuredKeySequenceSelector() {
 
-            KeySequenceConfigRepository repository = createKeySequenceConfigRepository(this.chronicleMap);
+            KeySequenceConfigRepository repository = createKeySequenceConfigRepository(this.mapProxy);
             keySequenceSelector.withRepository(repository);
 
             KeySequence keySequence = keySequenceSelector.firstAvailable();
@@ -432,9 +430,9 @@ public class ChronicleMapRetryFailoverPolicy implements FailoverPolicy<ItemSourc
         @Override
         public void onCorruption(ChronicleHashCorruption corruption) {
             if (corruption.exception() != null) {
-                LOGGER.error(corruption.message(), corruption.exception());
+                getLogger().error(corruption.message(), corruption.exception());
             } else {
-                LOGGER.error(corruption.message());
+                getLogger().error(corruption.message());
             }
         }
 
@@ -448,7 +446,7 @@ public class ChronicleMapRetryFailoverPolicy implements FailoverPolicy<ItemSourc
             int totalKeys = failedItems.size();
             long enqueuedKeys = keySequenceSelector.currentKeySequence().get().readerKeysAvailable();
 
-            LOGGER.info(
+            getLogger().info(
                     "sequenceId: {}, total: {}, enqueued: {}",
                     keySequenceSelector.currentKeySequence().get().getConfig(true).getSeqId(),
                     totalKeys,

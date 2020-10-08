@@ -31,10 +31,9 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
-import static org.appenders.log4j2.elasticsearch.failover.UUIDSequence.RESERVED_KEYS;
+import static org.appenders.log4j2.elasticsearch.failover.KeySequenceConfigTest.createDefaultTestKeySequenceConfig;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -48,10 +47,7 @@ import static org.mockito.Mockito.when;
 
 public class KeySequenceConfigRepositoryTest {
 
-    static final int DEFAULT_OFFSET = 100;
-    static final int SEQ_ID_OFFSET = DEFAULT_OFFSET;
     static final long DEFAULT_TEST_KEY_SEQUENCE_EXPIRY = 1000;
-    private static int offsetMultiplier = 1;
 
     private static Random random = new Random();
 
@@ -165,7 +161,7 @@ public class KeySequenceConfigRepositoryTest {
         Map<CharSequence, ItemSource> map = createDefaultTestMap();
         KeySequenceConfigRepository repository = new KeySequenceConfigRepository(map, DEFAULT_TEST_KEY_SEQUENCE_EXPIRY);
 
-        KeySequenceConfig config = createTestKeySequenceConfig();
+        KeySequenceConfig config = createDefaultTestKeySequenceConfig();
 
         CharSequence expectedKey = config.getKey();
 
@@ -186,7 +182,7 @@ public class KeySequenceConfigRepositoryTest {
         Map<CharSequence, ItemSource> map = createDefaultTestMap();
         KeySequenceConfigRepository repository = spy(new KeySequenceConfigRepository(map, DEFAULT_TEST_KEY_SEQUENCE_EXPIRY));
 
-        KeySequenceConfig config = createTestKeySequenceConfig();
+        KeySequenceConfig config = createDefaultTestKeySequenceConfig();
         CharSequence expectedKey = config.getKey();
 
         map.put(expectedKey, config);
@@ -210,7 +206,7 @@ public class KeySequenceConfigRepositoryTest {
         Map<CharSequence, ItemSource> map = createDefaultTestMap();
         KeySequenceConfigRepository repository = new KeySequenceConfigRepository(map, DEFAULT_TEST_KEY_SEQUENCE_EXPIRY);
 
-        KeySequenceConfig config = createTestKeySequenceConfig();
+        KeySequenceConfig config = createDefaultTestKeySequenceConfig();
 
         CharSequence expectedKey = config.getKey();
 
@@ -229,7 +225,7 @@ public class KeySequenceConfigRepositoryTest {
         Map<CharSequence, ItemSource> map = createDefaultTestMap();
         KeySequenceConfigRepository repository = spy(new KeySequenceConfigRepository(map, DEFAULT_TEST_KEY_SEQUENCE_EXPIRY));
 
-        KeySequenceConfig config = createTestKeySequenceConfig();
+        KeySequenceConfig config = createDefaultTestKeySequenceConfig();
         repository.persist(config);
 
         CharSequence nonExpectedKey = config.getKey();
@@ -253,7 +249,7 @@ public class KeySequenceConfigRepositoryTest {
         Map<CharSequence, ItemSource> map = createDefaultTestMap();
         KeySequenceConfigRepository repository = spy(new KeySequenceConfigRepository(map, DEFAULT_TEST_KEY_SEQUENCE_EXPIRY));
 
-        KeySequenceConfig config = createTestKeySequenceConfig();
+        KeySequenceConfig config = createDefaultTestKeySequenceConfig();
         repository.persist(config);
 
         CharSequence nonExpectedKey = config.getKey();
@@ -274,9 +270,9 @@ public class KeySequenceConfigRepositoryTest {
         Map<CharSequence, ItemSource> map = createDefaultTestMap();
         KeySequenceConfigRepository repository = spy(new KeySequenceConfigRepository(map, DEFAULT_TEST_KEY_SEQUENCE_EXPIRY));
 
-        KeySequenceConfig config1 = createTestKeySequenceConfig();
-        KeySequenceConfig config2 = createTestKeySequenceConfig();
-        KeySequenceConfig config3 = createTestKeySequenceConfig();
+        KeySequenceConfig config1 = createDefaultTestKeySequenceConfig();
+        KeySequenceConfig config2 = createDefaultTestKeySequenceConfig();
+        KeySequenceConfig config3 = createDefaultTestKeySequenceConfig();
         repository.persist(config1);
         repository.persist(config2);
 
@@ -302,7 +298,7 @@ public class KeySequenceConfigRepositoryTest {
         Map<CharSequence, ItemSource> map = createDefaultTestMap();
         KeySequenceConfigRepository repository = new KeySequenceConfigRepository(map);
 
-        KeySequenceConfig config = createTestKeySequenceConfig();
+        KeySequenceConfig config = createDefaultTestKeySequenceConfig();
 
         CharSequence expectedKey = config.getKey();
 
@@ -327,7 +323,7 @@ public class KeySequenceConfigRepositoryTest {
         long providedExpiry = 15000L;
         KeySequenceConfigRepository repository = new KeySequenceConfigRepository(map, providedExpiry);
 
-        KeySequenceConfig config = createTestKeySequenceConfig();
+        KeySequenceConfig config = createDefaultTestKeySequenceConfig();
 
         CharSequence expectedKey = config.getKey();
 
@@ -350,7 +346,7 @@ public class KeySequenceConfigRepositoryTest {
         long minimumExpectedExpiry = 20000L;
         KeySequenceConfigRepository repository = new KeySequenceConfigRepository(map, minimumExpectedExpiry);
 
-        KeySequenceConfig config = createTestKeySequenceConfig();
+        KeySequenceConfig config = createDefaultTestKeySequenceConfig();
 
         CharSequence expectedKey = config.getKey();
 
@@ -371,7 +367,7 @@ public class KeySequenceConfigRepositoryTest {
 
         Map<CharSequence, ItemSource> map = createDefaultTestMap();
         KeySequenceConfigRepository repository = new KeySequenceConfigRepository(map, 0);
-        KeySequenceConfig config = createTestKeySequenceConfig();
+        KeySequenceConfig config = createDefaultTestKeySequenceConfig();
 
         repository.persist(config);
 
@@ -391,7 +387,7 @@ public class KeySequenceConfigRepositoryTest {
 
         Map<CharSequence, ItemSource> map = createDefaultTestMap();
         KeySequenceConfigRepository repository = new KeySequenceConfigRepository(map, 0);
-        KeySequenceConfig config = createTestKeySequenceConfig();
+        KeySequenceConfig config = createDefaultTestKeySequenceConfig();
         repository.persist(config);
 
         // when
@@ -405,16 +401,8 @@ public class KeySequenceConfigRepositoryTest {
 
     }
 
-    public KeySequenceConfig createTestKeySequenceConfig() {
-        return new KeySequenceConfig(UUID.randomUUID().getMostSignificantBits(), RESERVED_KEYS, RESERVED_KEYS);
-    }
-
     public HashMap<CharSequence, ItemSource> createDefaultTestMap() {
         return new HashMap<>();
-    }
-
-    public static KeySequenceConfig createDefaultTestKeySequenceConfig() {
-        return new KeySequenceConfig(random.nextInt(DEFAULT_OFFSET) + SEQ_ID_OFFSET * offsetMultiplier++, RESERVED_KEYS, RESERVED_KEYS);
     }
 
 }

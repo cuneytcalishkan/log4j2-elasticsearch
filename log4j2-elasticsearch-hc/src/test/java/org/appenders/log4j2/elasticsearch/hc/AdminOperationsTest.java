@@ -39,7 +39,7 @@ import java.util.function.Function;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -179,7 +179,7 @@ public class AdminOperationsTest {
         BatchResult result = mock(BatchResult.class);
         when(httpClient.execute(any(), any())).thenAnswer(invocation -> {
             IndexTemplateRequest templateRequest = invocation
-                    .getArgumentAt(0, IndexTemplateRequest.class);
+                    .getArgument(0);
             argCaptor.set(((ByteBuf)templateRequest.source).copy());
             return result;
         });

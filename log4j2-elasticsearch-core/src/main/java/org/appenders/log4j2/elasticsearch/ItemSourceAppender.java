@@ -20,18 +20,16 @@ package org.appenders.log4j2.elasticsearch;
  * #L%
  */
 
-import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.LogEvent;
-import org.apache.logging.log4j.status.StatusLogger;
 
 import java.util.function.Function;
+
+import static org.appenders.core.logging.InternalLogging.getLogger;
 
 /**
  * {@link BatchDelivery#add(String, ItemSource)} call wrapper
  */
 public class ItemSourceAppender implements ItemAppender<LogEvent> {
-
-    static final Logger LOG = StatusLogger.getLogger();
 
     private volatile State state = State.STOPPED;
 
@@ -59,21 +57,21 @@ public class ItemSourceAppender implements ItemAppender<LogEvent> {
         batchDelivery.start();
         state = State.STARTED;
 
-        LOG.debug("{} started", getClass().getSimpleName());
+        getLogger().debug("{} started", getClass().getSimpleName());
 
     }
 
     @Override
     public void stop() {
 
-        LOG.debug("Stopping {}", getClass().getSimpleName());
+        getLogger().debug("Stopping {}", getClass().getSimpleName());
 
         if (!batchDelivery.isStopped()) {
             batchDelivery.stop();
         }
         state = State.STOPPED;
 
-        LOG.debug("{} stopped", getClass().getSimpleName());
+        getLogger().debug("{} stopped", getClass().getSimpleName());
 
     }
 

@@ -27,14 +27,11 @@ import io.searchbox.client.JestResult;
 import io.searchbox.client.JestResultHandler;
 import io.searchbox.core.Bulk;
 import io.searchbox.core.DocumentResult;
-import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.ConfigurationException;
 import org.apache.logging.log4j.core.config.Node;
 import org.apache.logging.log4j.core.config.plugins.Plugin;
 import org.apache.logging.log4j.core.config.plugins.PluginBuilderFactory;
 import org.apache.logging.log4j.core.config.plugins.PluginElement;
-import org.apache.logging.log4j.status.StatusLogger;
-import org.appenders.log4j2.elasticsearch.Auth;
 import org.appenders.log4j2.elasticsearch.BatchOperations;
 import org.appenders.log4j2.elasticsearch.ClientObjectFactory;
 import org.appenders.log4j2.elasticsearch.ClientProvider;
@@ -42,68 +39,23 @@ import org.appenders.log4j2.elasticsearch.FailoverPolicy;
 import org.appenders.log4j2.elasticsearch.ItemSourceFactory;
 import org.appenders.log4j2.elasticsearch.JacksonMixIn;
 import org.appenders.log4j2.elasticsearch.PooledItemSourceFactory;
-import org.appenders.log4j2.elasticsearch.backoff.NoopBackoffPolicy;
 import org.appenders.log4j2.elasticsearch.failover.FailedItemOps;
 import org.appenders.log4j2.elasticsearch.jest.failover.BufferedHttpFailedItemOps;
 
-import java.util.Collection;
 import java.util.function.Function;
 
-import static org.appenders.log4j2.elasticsearch.jest.BufferedBulkOperations.DEFAULT_MAPPING_TYPE;
+import static org.appenders.core.logging.InternalLogging.getLogger;
 
 @Plugin(name = BufferedJestHttpObjectFactory.PLUGIN_NAME, category = Node.CATEGORY, elementType = ClientObjectFactory.ELEMENT_TYPE, printObject = true)
 public class BufferedJestHttpObjectFactory extends JestHttpObjectFactory {
 
     public static final String PLUGIN_NAME = "JestBufferedHttp";
 
-    private static Logger LOG = StatusLogger.getLogger();
-
     private volatile State state = State.STOPPED;
 
     private final PooledItemSourceFactory itemSourceFactory;
 
     private final JacksonMixIn[] mixIns;
-
-    /**
-     * This constructor is deprecated and will be removed in 1.5.
-     *
-     * @param serverUris
-     * @param connTimeout
-     * @param readTimeout
-     * @param maxTotalConnections
-     * @param defaultMaxTotalConnectionPerRoute
-     * @param discoveryEnabled
-     * @param bufferedSourceFactory
-     * @param auth
-     *
-     * @deprecated As of 1.5, this constructor will be removed. Use {@link #BufferedJestHttpObjectFactory(Builder)} instead
-     */
-    @Deprecated
-    protected BufferedJestHttpObjectFactory(
-            Collection<String> serverUris,
-            int connTimeout,
-            int readTimeout,
-            int maxTotalConnections,
-            int defaultMaxTotalConnectionPerRoute,
-            boolean discoveryEnabled,
-            PooledItemSourceFactory bufferedSourceFactory,
-            Auth<io.searchbox.client.config.HttpClientConfig.Builder> auth
-    ) {
-        super(
-                serverUris,
-                connTimeout,
-                readTimeout,
-                maxTotalConnections,
-                defaultMaxTotalConnectionPerRoute,
-                Runtime.getRuntime().availableProcessors(),
-                discoveryEnabled,
-                auth,
-                DEFAULT_MAPPING_TYPE,
-                new NoopBackoffPolicy()
-        );
-        this.itemSourceFactory = bufferedSourceFactory;
-        this.mixIns = new JacksonMixIn[]{};
-    }
 
     protected BufferedJestHttpObjectFactory(Builder builder) {
         super(builder);
@@ -115,14 +67,14 @@ public class BufferedJestHttpObjectFactory extends JestHttpObjectFactory {
     public Function<Bulk, Boolean> createFailureHandler(FailoverPolicy failover) {
         return bulk -> {
             BufferedBulk bufferedBulk = (BufferedBulk)bulk;
-            LOG.warn(String.format("Batch of %s items failed. Redirecting to %s", bufferedBulk.getActions().size(), failover.getClass().getName()));
+            getLogger().warn(String.format("Batch of %s items failed. Redirecting to %s", bufferedBulk.getActions().size(), failover.getClass().getName()));
             try {
                 bufferedBulk.getActions().stream()
                         .map(item -> failedItemOps.createItem(((BufferedIndex) item)))
                         .forEach(failover::deliver);
                 return true;
             } catch (Exception e) {
-                LOG.error("Unable to execute failover", e);
+                getLogger().error("Unable to execute failover", e);
                 return false;
             }
         };
@@ -142,7 +94,7 @@ public class BufferedJestHttpObjectFactory extends JestHttpObjectFactory {
                 backoffPolicy.deregister(bulk);
 
                 if (!result.isSucceeded()) {
-                    LOG.warn(result.getErrorMessage());
+                    getLogger().warn(result.getErrorMessage());
                     // TODO: filter only failed items when retry is ready.
                     // failing whole bulk for now
                     failureHandler.apply(bulk);
@@ -152,7 +104,7 @@ public class BufferedJestHttpObjectFactory extends JestHttpObjectFactory {
 
             @Override
             public void failed(Exception ex) {
-                LOG.warn(ex.getMessage(), ex);
+                getLogger().warn(ex.getMessage(), ex);
                 backoffPolicy.deregister(bulk);
                 failureHandler.apply(bulk);
                 ((BufferedBulk)bulk).completed();

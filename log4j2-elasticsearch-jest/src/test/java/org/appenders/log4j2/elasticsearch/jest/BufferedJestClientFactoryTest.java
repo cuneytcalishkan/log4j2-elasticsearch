@@ -27,8 +27,8 @@ import org.junit.Test;
 
 import java.util.concurrent.TimeUnit;
 
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -83,7 +83,7 @@ public class BufferedJestClientFactoryTest {
     public void getObjectConfiguresNodeCheckerIfDiscoveryEnabled() {
 
         // given
-        HttpClientConfig.Builder httpClientConfigBuilder = createDefaultTestHttpClientConfig();
+        HttpClientConfig.Builder httpClientConfigBuilder = createDefaultTestHttpClientConfigBuilder();
         httpClientConfigBuilder.discoveryEnabled(true);
 
         BufferedJestClientFactory factory = spy(createDefaultTestBufferedJestClientFactory(httpClientConfigBuilder));
@@ -103,7 +103,7 @@ public class BufferedJestClientFactoryTest {
     public void getObjectDoesNotConfigureNodeCheckerIfDiscoveryNotEnabled() {
 
         // given
-        HttpClientConfig.Builder httpClientConfigBuilder = createDefaultTestHttpClientConfig();
+        HttpClientConfig.Builder httpClientConfigBuilder = createDefaultTestHttpClientConfigBuilder();
         httpClientConfigBuilder.discoveryEnabled(false);
 
         BufferedJestClientFactory factory = spy(createDefaultTestBufferedJestClientFactory(httpClientConfigBuilder));
@@ -123,7 +123,7 @@ public class BufferedJestClientFactoryTest {
     public void getObjectConfiguresConnectionReaperIfMaxConnectionIdleTimeIsGreaterThanZero() {
 
         // given
-        HttpClientConfig.Builder httpClientConfigBuilder = createDefaultTestHttpClientConfig();
+        HttpClientConfig.Builder httpClientConfigBuilder = createDefaultTestHttpClientConfigBuilder();
         httpClientConfigBuilder.maxConnectionIdleTime(1000, TimeUnit.MILLISECONDS);
 
         BufferedJestClientFactory factory = spy(createDefaultTestBufferedJestClientFactory(httpClientConfigBuilder));
@@ -143,7 +143,7 @@ public class BufferedJestClientFactoryTest {
     public void getObjectDoesNotConfigureConnectionReaperIfMaxConnectionIdleTimeIsZero() {
 
         // given
-        HttpClientConfig.Builder httpClientConfigBuilder = createDefaultTestHttpClientConfig();
+        HttpClientConfig.Builder httpClientConfigBuilder = createDefaultTestHttpClientConfigBuilder();
         httpClientConfigBuilder.maxConnectionIdleTime(0, TimeUnit.MILLISECONDS);
 
         BufferedJestClientFactory factory = spy(createDefaultTestBufferedJestClientFactory(httpClientConfigBuilder));
@@ -160,16 +160,16 @@ public class BufferedJestClientFactoryTest {
     }
 
     private BufferedJestClientFactory createDefaultTestBufferedJestClientFactory() {
-        return createDefaultTestBufferedJestClientFactory(createDefaultTestHttpClientConfig());
+        return createDefaultTestBufferedJestClientFactory(createDefaultTestHttpClientConfigBuilder());
     }
 
     private BufferedJestClientFactory createDefaultTestBufferedJestClientFactory(HttpClientConfig.Builder httpClientconfigBuilder) {
-        BufferedJestClientFactory factory = new BufferedJestClientFactory(httpClientconfigBuilder.build());
-//        factory.setHttpClientConfig(httpClientconfigBuilder.build());
-        return factory;
+        return new BufferedJestClientFactory(
+                new WrappedHttpClientConfig.Builder(httpClientconfigBuilder.build())
+                        .build());
     }
 
-    private HttpClientConfig.Builder createDefaultTestHttpClientConfig() {
+    private HttpClientConfig.Builder createDefaultTestHttpClientConfigBuilder() {
         return new HttpClientConfig.Builder("http://localhost:9200");
     }
 

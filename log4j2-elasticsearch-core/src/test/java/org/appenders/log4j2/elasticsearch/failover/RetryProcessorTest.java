@@ -21,9 +21,7 @@ package org.appenders.log4j2.elasticsearch.failover;
  */
 
 import org.appenders.log4j2.elasticsearch.ItemSource;
-import org.junit.Assert;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.util.HashMap;
@@ -31,6 +29,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.function.Supplier;
 
+import static org.appenders.log4j2.elasticsearch.failover.UUIDSequenceTest.createDefaultTestKeySequenceConfig;
 import static org.appenders.log4j2.elasticsearch.failover.SingleKeySequenceSelectorTest.DEFAULT_TEST_SEQUENCE_ID;
 import static org.appenders.log4j2.elasticsearch.failover.UUIDSequence.RESERVED_KEYS;
 import static org.junit.Assert.assertEquals;
@@ -68,7 +67,7 @@ public class RetryProcessorTest {
         fillMap(items, 0, keySequenceSelector, () -> itemSource);
 
         RetryListener[] listeners = {listener};
-        RetryProcessor retryProcessor = spy(new RetryProcessor(DEFAULT_TEST_MAX_RETRY_SIZE, items, listeners, keySequenceSelector));
+        RetryProcessor retryProcessor = spy(createRetryProcessor(DEFAULT_TEST_MAX_RETRY_SIZE, items, keySequenceSelector, listeners));
 
         // when
         retryProcessor.run();
@@ -95,7 +94,8 @@ public class RetryProcessorTest {
         fillMap(items, expectedSize, keySequenceSelector, () -> itemSource);
 
         RetryListener[] listeners = {listener};
-        RetryProcessor retryProcessor = new RetryProcessor(expectedSize, items, listeners, keySequenceSelector);
+        RetryProcessor retryProcessor =
+                createRetryProcessor(expectedSize, items, keySequenceSelector, listeners);
 
         // when
         retryProcessor.retry();
@@ -117,7 +117,8 @@ public class RetryProcessorTest {
         when(keySequenceSelector.firstAvailable()).thenReturn(null);
 
         RetryListener[] listeners = {listener};
-        RetryProcessor retryProcessor = new RetryProcessor(DEFAULT_TEST_MAX_RETRY_SIZE, items, listeners, keySequenceSelector);
+        RetryProcessor retryProcessor =
+                createRetryProcessor(DEFAULT_TEST_MAX_RETRY_SIZE, items, keySequenceSelector, listeners);
 
         // when
         retryProcessor.retry();
@@ -142,7 +143,8 @@ public class RetryProcessorTest {
         fillMap(items, 0, keySequenceSelector, () -> itemSource);
 
         RetryListener[] listeners = {listener};
-        RetryProcessor retryProcessor = new RetryProcessor(maxRetryBatchSize, items, listeners, keySequenceSelector);
+        RetryProcessor retryProcessor =
+                createRetryProcessor(maxRetryBatchSize, items, keySequenceSelector, listeners);
 
         // when
         retryProcessor.retry();
@@ -168,7 +170,8 @@ public class RetryProcessorTest {
         fillMap(items, mapSize, keySequenceSelector, () -> itemSource);
 
         RetryListener[] listeners = {listener};
-        RetryProcessor retryProcessor = new RetryProcessor(maxRetryBatchSize, items, listeners, keySequenceSelector);
+        RetryProcessor retryProcessor =
+                createRetryProcessor(maxRetryBatchSize, items, keySequenceSelector, listeners);
 
         // when
         retryProcessor.retry();
@@ -194,7 +197,8 @@ public class RetryProcessorTest {
         fillMap(items, mapSize, keySequenceSelector, () -> itemSource);
 
         RetryListener[] listeners = {listener};
-        RetryProcessor retryProcessor = new RetryProcessor(maxRetryBatchSize, items, listeners, keySequenceSelector);
+        RetryProcessor retryProcessor =
+                createRetryProcessor(maxRetryBatchSize, items, keySequenceSelector, listeners);
 
         // when
         retryProcessor.retry();
@@ -220,12 +224,13 @@ public class RetryProcessorTest {
         KeySequenceSelector keySequenceSelector = createDefaultTestKeySequenceSelector(sequenceId, items);
         fillMap(items, mapSize, keySequenceSelector, () -> itemSource);
 
-        UUIDSequence keySequence = new UUIDSequence(UUIDSequenceTest.createDefaultTestKeySequenceConfig());
+        UUIDSequence keySequence = new UUIDSequence(createDefaultTestKeySequenceConfig());
         keySequence.nextWriterKey(); // progress key sequence
         items.remove(keySequence.nextReaderKey()); // have to remove AFTER keySequenceSelector initialization
 
         RetryListener[] listeners = {listener};
-        RetryProcessor retryProcessor = new RetryProcessor(maxRetryBatchSize, items, listeners, keySequenceSelector);
+        RetryProcessor retryProcessor =
+                createRetryProcessor(maxRetryBatchSize, items, keySequenceSelector, listeners);
 
         // when
         retryProcessor.retry();
@@ -252,7 +257,8 @@ public class RetryProcessorTest {
         fillMap(items, 1, keySequenceSelector, () -> itemSource);
 
         RetryListener[] listeners = {listener};
-        RetryProcessor retryProcessor = new RetryProcessor(DEFAULT_TEST_MAX_RETRY_SIZE, items, listeners, keySequenceSelector);
+        RetryProcessor retryProcessor =
+                createRetryProcessor(DEFAULT_TEST_MAX_RETRY_SIZE, items, keySequenceSelector, listeners);
 
         // when
         long start = System.currentTimeMillis();
@@ -278,7 +284,7 @@ public class RetryProcessorTest {
         KeySequenceSelector keySequenceSelector = createDefaultTestKeySequenceSelector(DEFAULT_TEST_SEQUENCE_ID, items);
         fillMap(items, mapSize, keySequenceSelector, () -> itemSource);
 
-        UUIDSequence keySequence = new UUIDSequence(UUIDSequenceTest.createDefaultTestKeySequenceConfig());
+        UUIDSequence keySequence = new UUIDSequence(createDefaultTestKeySequenceConfig());
         keySequence.nextWriterKey(); // progress key sequence
 
         ItemSource invalidItemSource = mock(ItemSource.class);
@@ -286,7 +292,8 @@ public class RetryProcessorTest {
         items.put(readerKey, invalidItemSource); // replace 1 element
 
         RetryListener[] listeners = {listener};
-        RetryProcessor retryProcessor = new RetryProcessor(maxRetryBatchSize, items, listeners, keySequenceSelector);
+        RetryProcessor retryProcessor =
+                createRetryProcessor(maxRetryBatchSize, items, keySequenceSelector, listeners);
 
         // when
         retryProcessor.retry();
@@ -317,6 +324,10 @@ public class RetryProcessorTest {
     public KeySequenceSelector createDefaultTestKeySequenceSelector(long sequenceId, Map<CharSequence, ItemSource> items) {
         return new SingleKeySequenceSelector(DEFAULT_TEST_SEQUENCE_ID)
                 .withRepository(new KeySequenceConfigRepository(items));
+    }
+
+    public RetryProcessor createRetryProcessor(int expectedSize, Map<CharSequence, ItemSource> items, KeySequenceSelector keySequenceSelector, RetryListener[] listeners) {
+        return new RetryProcessor(expectedSize, items, listeners, keySequenceSelector);
     }
 
 }

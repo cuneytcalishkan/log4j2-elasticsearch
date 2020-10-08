@@ -20,14 +20,11 @@ package org.appenders.log4j2.elasticsearch.failover;
  * #L%
  */
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
 import net.openhft.chronicle.bytes.Bytes;
-import net.openhft.chronicle.bytes.HeapBytesStore;
-import net.openhft.chronicle.bytes.VanillaBytes;
 import net.openhft.chronicle.wire.WireIn;
 import net.openhft.chronicle.wire.WireOut;
 import org.appenders.log4j2.elasticsearch.ByteBufItemSource;
@@ -41,13 +38,15 @@ import java.io.OutputStream;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.appenders.log4j2.elasticsearch.ByteBufItemSourceTest.createTestItemSource;
+import static org.appenders.log4j2.elasticsearch.failover.FailedItemSourceTest.createTestFailedItemSource;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 public class FailedItemMarshallerTest {
@@ -166,7 +165,7 @@ public class FailedItemMarshallerTest {
         failedItemMarshaller.readMarshallable(wireIn);
 
         // then
-        verifyZeroInteractions(wireIn);
+        verifyNoInteractions(wireIn);
 
     }
 
@@ -182,7 +181,7 @@ public class FailedItemMarshallerTest {
         failedItemMarshaller.writeMarshallable(wireOut);
 
         // then
-        verifyZeroInteractions(wireOut);
+        verifyNoInteractions(wireOut);
 
     }
 
@@ -193,9 +192,9 @@ public class FailedItemMarshallerTest {
         FailedItemMarshaller failedItemMarshaller = new FailedItemMarshaller();
 
         CompositeByteBuf byteBuf = new CompositeByteBuf(PooledByteBufAllocator.DEFAULT, false, 2).capacity(1024);
-        ByteBufItemSource itemSource = new ByteBufItemSource(byteBuf, source -> {});
+        ByteBufItemSource itemSource = createTestItemSource(byteBuf, source -> {});
         FailedItemSource<ByteBuf> failedItemSource =
-                new FailedItemSource<>(itemSource, new FailedItemInfo(UUID.randomUUID().toString()));
+                createTestFailedItemSource(itemSource, new FailedItemInfo(UUID.randomUUID().toString()));
 
         ReusableByteBufOutputStream outputStream =
                 new ReusableByteBufOutputStream(byteBuf);

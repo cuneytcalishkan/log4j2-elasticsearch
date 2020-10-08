@@ -20,16 +20,12 @@ package org.appenders.log4j2.elasticsearch.failover;
  * #L%
  */
 
-import net.openhft.chronicle.core.util.Time;
-
 import java.util.Iterator;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Predicate;
 
 /**
- * Provides a sequence of UUID(n, m), where n >= 0 and m >= 0
+ * Provides a sequence of UUID(n, m), where n &gt;= 0 and m &gt;= 0
  */
 public class UUIDSequence implements KeySequence {
 

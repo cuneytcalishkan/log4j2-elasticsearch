@@ -31,6 +31,7 @@ import org.appenders.log4j2.elasticsearch.ElasticsearchAppender;
 import org.appenders.log4j2.elasticsearch.IndexNameFormatter;
 import org.appenders.log4j2.elasticsearch.IndexTemplate;
 import org.appenders.log4j2.elasticsearch.JacksonJsonLayout;
+import org.appenders.log4j2.elasticsearch.Log4j2Lookup;
 import org.appenders.log4j2.elasticsearch.PooledItemSourceFactory;
 import org.appenders.log4j2.elasticsearch.RollingIndexNameFormatter;
 import org.appenders.log4j2.elasticsearch.UnlimitedResizePolicy;
@@ -47,29 +48,30 @@ import org.appenders.log4j2.elasticsearch.hc.Security;
 import org.appenders.log4j2.elasticsearch.smoke.SmokeTestBase;
 import org.junit.Ignore;
 
+import static org.appenders.core.util.PropertiesUtil.getInt;
+
 @Ignore
 public class SmokeTest extends SmokeTestBase {
-
-    public static final int BATCH_SIZE = 10000;
-    public static final int ADDITIONAL_BATCH_SIZE = (int) (BATCH_SIZE * 0.2); // prevent tiny batches by allowing notifier to 
-    public static final int INITIAL_ITEM_POOL_SIZE = 40000;
-    public static final int INITIAL_ITEM_SIZE_IN_BYTES = 256;
-    public static final int INITIAL_BATCH_POOL_SIZE = 4;
 
     @Override
     public ElasticsearchAppender.Builder createElasticsearchAppenderBuilder(boolean messageOnly, boolean buffered, boolean secured) {
 
+        final int batchSize = getInt("smokeTest.batchSize", 10000);
+        final int additionalBatchSize = (int) (batchSize * 0.2); // prevent tiny batches
+        final int initialItemPoolSize = getInt("smokeTest.initialItemPoolSize", 40000);
+        final int initialItemBufferSizeInBytes = getInt("smokeTest.initialItemBufferSizeInBytes", 1024);
+        final int initialBatchPoolSize = getInt("smokeTest.initialBatchPoolSize", 4);
+
         HCHttp.Builder httpObjectFactoryBuilder;
         httpObjectFactoryBuilder = HCHttp.newBuilder();
 
-        int estimatedBatchSizeInBytes = BATCH_SIZE * INITIAL_ITEM_SIZE_IN_BYTES;
+        int estimatedBatchSizeInBytes = batchSize * initialItemBufferSizeInBytes;
 
         httpObjectFactoryBuilder.withItemSourceFactory(
                 PooledItemSourceFactory.newBuilder()
                         .withPoolName("batchPool")
-                        .withInitialPoolSize(INITIAL_BATCH_POOL_SIZE)
+                        .withInitialPoolSize(initialBatchPoolSize)
                         .withItemSizeInBytes(estimatedBatchSizeInBytes)
-                        .withResizePolicy(new UnlimitedResizePolicy.Builder().build())
                         .withMonitored(true)
                         .withMonitorTaskInterval(10000)
                         .build()
@@ -79,7 +81,6 @@ public class SmokeTest extends SmokeTestBase {
                 .withReadTimeout(20000)
                 .withIoThreadCount(4)
                 .withMaxTotalConnections(8)
-                .withMappingType("_doc")
                 .withBackoffPolicy(new BatchLimitBackoffPolicy<>(4));
 
         if (secured) {
@@ -89,9 +90,11 @@ public class SmokeTest extends SmokeTestBase {
             httpObjectFactoryBuilder.withServerUris("http://localhost:9200");
         }
 
+        LoggerContext ctx = LoggerContext.getContext(false);
         IndexTemplate indexTemplate = new IndexTemplate.Builder()
-                .withName("log4j2_test")
+                .withName("log4j2-elasticsearch-programmatic-test-template")
                 .withPath("classpath:indexTemplate-7.json")
+                .withValueResolver(new Log4j2Lookup(ctx.getConfiguration().getStrSubstitutor()))
                 .build();
 
         KeySequenceSelector keySequenceSelector =
@@ -101,7 +104,7 @@ public class SmokeTest extends SmokeTestBase {
 
         BatchDelivery asyncBatchDelivery = AsyncBatchDelivery.newBuilder()
                 .withClientObjectFactory(httpObjectFactoryBuilder.build())
-                .withBatchSize(BATCH_SIZE + ADDITIONAL_BATCH_SIZE)
+                .withBatchSize(batchSize + additionalBatchSize)
                 .withDeliveryInterval(1000)
                 .withIndexTemplate(indexTemplate)
                 .withFailoverPolicy(new ChronicleMapRetryFailoverPolicy.Builder()
@@ -109,9 +112,6 @@ public class SmokeTest extends SmokeTestBase {
                         .withFileName("failedItems.chronicleMap")
                         .withNumberOfEntries(1000000)
                         .withAverageValueSize(2048)
-                        .withFileName("c:/Users/bh/Downloads/failedItems.chronicleMap")
-                        .withNumberOfEntries(1000000)
-                        .withAverageValueSize(2024)
                         .withBatchSize(5000)
                         .withRetryDelay(4000)
                         .withMonitored(true)
@@ -125,25 +125,24 @@ public class SmokeTest extends SmokeTestBase {
                 .withPattern("yyyy-MM-dd-HH")
                 .build();
 
-        LoggerContext ctx = LoggerContext.getContext(false);
         JacksonJsonLayout.Builder layoutBuilder = JacksonJsonLayout.newBuilder()
                 .setConfiguration(ctx.getConfiguration())
                 .withVirtualProperties(
                         new VirtualProperty("hostname", "${env:hostname:-undefined}", false),
                         new VirtualProperty("progField", "constantValue", false)
-                );
+                )
+                .withSingleThread(true);
 
         if (buffered) {
             PooledItemSourceFactory sourceFactoryConfig = PooledItemSourceFactory.newBuilder()
                     .withPoolName("itemPool")
-                    .withInitialPoolSize(INITIAL_ITEM_POOL_SIZE)
-                    .withItemSizeInBytes(INITIAL_ITEM_SIZE_IN_BYTES)
+                    .withInitialPoolSize(initialItemPoolSize)
+                    .withItemSizeInBytes(initialItemBufferSizeInBytes)
                     .withResizePolicy(new UnlimitedResizePolicy.Builder().build())
                     .withMonitored(true)
                     .withMonitorTaskInterval(10000)
                     .build();
-            layoutBuilder.withItemSourceFactory(sourceFactoryConfig)
-                    .withAfterburner(true).build();
+            layoutBuilder.withItemSourceFactory(sourceFactoryConfig).build();
         }
 
         return ElasticsearchAppender.newBuilder()

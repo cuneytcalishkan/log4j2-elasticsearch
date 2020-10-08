@@ -32,28 +32,17 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
 import org.apache.http.nio.conn.NHttpClientConnectionManager;
-import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.status.StatusLogger;
+
+import static org.appenders.core.logging.InternalLogging.getLogger;
 
 /**
  * Creates configured {@link BufferedJestHttpClient}
  */
 public class BufferedJestClientFactory extends ExtendedJestClientFactory {
 
-    private static final Logger LOG = StatusLogger.getLogger();
-
     /**
-     * This constructor is deprecated, it will be removed in 1.5,
-     * use {@link #BufferedJestClientFactory(WrappedHttpClientConfig)} instead
-     *
-     * @param httpClientConfig {@link io.searchbox.client.config.HttpClientConfig}
-     * @deprecated As of 1.5, this constructor will be removed
+     * @param wrappedHttpClientConfig HTTP config
      */
-    @Deprecated
-    public BufferedJestClientFactory(io.searchbox.client.config.HttpClientConfig httpClientConfig) {
-        super(new WrappedHttpClientConfig.Builder(httpClientConfig).build());
-    }
-
     public BufferedJestClientFactory(WrappedHttpClientConfig wrappedHttpClientConfig) {
         super(wrappedHttpClientConfig);
     }
@@ -77,14 +66,14 @@ public class BufferedJestClientFactory extends ExtendedJestClientFactory {
         if (httpClientConfig.getMaxConnectionIdleTime() > 0) {
             createConnectionReaper(client, connectionManager, asyncConnectionManager);
         } else {
-            LOG.info("Idle connection reaping disabled");
+            getLogger().info("Idle connection reaping disabled");
         }
 
         // set discovery (should be set after setting the httpClient on jestClient)
         if (httpClientConfig.isDiscoveryEnabled()) {
             createNodeChecker(client, httpClientConfig);
         } else {
-            LOG.info("Node Discovery disabled");
+            getLogger().info("Node Discovery disabled");
         }
 
         client.getAsyncClient().start();
@@ -98,7 +87,7 @@ public class BufferedJestClientFactory extends ExtendedJestClientFactory {
 
     /* visible for testing */
     IdleConnectionReaper createConnectionReaper(JestHttpClient client, HttpClientConnectionManager connectionManager, NHttpClientConnectionManager asyncConnectionManager) {
-        LOG.info("Idle connection reaping enabled...");
+        getLogger().info("Idle connection reaping enabled...");
 
         IdleConnectionReaper reaper = new IdleConnectionReaper(wrappedHttpClientConfig.getHttpClientConfig(),
                 new HttpReapableConnectionManager(connectionManager, asyncConnectionManager));
@@ -109,7 +98,7 @@ public class BufferedJestClientFactory extends ExtendedJestClientFactory {
     }
 
     protected NodeChecker createNodeChecker(JestHttpClient client, io.searchbox.client.config.HttpClientConfig httpClientConfig) {
-        LOG.info("Node Discovery enabled...");
+        getLogger().info("Node Discovery enabled...");
         NodeChecker nodeChecker = new NodeChecker(client, httpClientConfig);
         client.setNodeChecker(nodeChecker);
         nodeChecker.startAsync();

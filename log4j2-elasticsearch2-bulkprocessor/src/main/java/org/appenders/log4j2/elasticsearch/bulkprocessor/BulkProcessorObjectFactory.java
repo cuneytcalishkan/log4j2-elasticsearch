@@ -9,9 +9,9 @@ package org.appenders.log4j2.elasticsearch.bulkprocessor;
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,7 +21,6 @@ package org.appenders.log4j2.elasticsearch.bulkprocessor;
  */
 
 
-import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.ConfigurationException;
 import org.apache.logging.log4j.core.config.Node;
 import org.apache.logging.log4j.core.config.plugins.Plugin;
@@ -29,7 +28,6 @@ import org.apache.logging.log4j.core.config.plugins.PluginBuilderAttribute;
 import org.apache.logging.log4j.core.config.plugins.PluginBuilderFactory;
 import org.apache.logging.log4j.core.config.plugins.PluginElement;
 import org.apache.logging.log4j.core.config.plugins.validation.constraints.Required;
-import org.apache.logging.log4j.status.StatusLogger;
 import org.appenders.log4j2.elasticsearch.Auth;
 import org.appenders.log4j2.elasticsearch.BatchOperations;
 import org.appenders.log4j2.elasticsearch.ClientObjectFactory;
@@ -51,20 +49,28 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.function.Function;
 
-@Plugin(name = "ElasticsearchBulkProcessor", category = Node.CATEGORY, elementType = ClientObjectFactory.ELEMENT_TYPE, printObject = true)
+import static org.appenders.core.logging.InternalLogging.getLogger;
+
+@Plugin(name = BulkProcessorObjectFactory.PLUGIN_NAME, category = Node.CATEGORY, elementType = ClientObjectFactory.ELEMENT_TYPE, printObject = true)
 public class BulkProcessorObjectFactory implements ClientObjectFactory<TransportClient, BulkRequest> {
 
-    private static Logger LOG = StatusLogger.getLogger();
+    static final String PLUGIN_NAME = "ElasticsearchBulkProcessor";
 
     private final Collection<String> serverUris;
     private final UriParser uriParser = new UriParser();
+    private final Auth auth;
+    private final ClientSettings clientSettings;
 
     private TransportClient client;
-    private final Auth<Settings.Builder> auth;
 
-    protected BulkProcessorObjectFactory(Collection<String> serverUris, Auth<Settings.Builder> auth) {
+    protected BulkProcessorObjectFactory(Collection<String> serverUris, Auth auth) {
+        this(serverUris, auth, new ClientSettings.Builder().build());
+    }
+
+    protected BulkProcessorObjectFactory(Collection<String> serverUris, Auth auth, ClientSettings clientSettings) {
         this.serverUris = serverUris;
         this.auth = auth;
+        this.clientSettings = clientSettings;
     }
 
     @Override
@@ -75,9 +81,7 @@ public class BulkProcessorObjectFactory implements ClientObjectFactory<Transport
     @Override
     public TransportClient createClient() {
         if (client == null) {
-
             TransportClient client = getClientProvider().createClient();
-
             for (String serverUri : serverUris) {
                 try {
                     String host = uriParser.getHost(serverUri);
@@ -89,8 +93,12 @@ public class BulkProcessorObjectFactory implements ClientObjectFactory<Transport
             }
             this.client = client;
         }
-
         return client;
+    }
+
+    // visible for testing
+    ClientProvider<TransportClient> getClientProvider() {
+        return auth == null ? new InsecureTransportClientProvider(clientSettings) : new SecureClientProvider(auth, clientSettings);
     }
 
     @Override
@@ -136,12 +144,8 @@ public class BulkProcessorObjectFactory implements ClientObjectFactory<Transport
         try {
             operation.execute();
         } catch (Exception e) {
-            LOG.error("Operation failed: {}", e.getMessage());
+            getLogger().error("Operation failed: {}", e.getMessage());
         }
-    }
-
-    ClientProvider<TransportClient> getClientProvider() {
-        return auth == null ? new InsecureTransportClientProvider() : new SecureClientProvider(auth);
     }
 
     @PluginBuilderFactory
@@ -149,22 +153,26 @@ public class BulkProcessorObjectFactory implements ClientObjectFactory<Transport
         return new Builder();
     }
 
-
     public static class Builder implements org.apache.logging.log4j.core.util.Builder<BulkProcessorObjectFactory> {
 
+        public static final ClientSettings DEFAULT_CLIENT_SETTINGS = ClientSettings.newBuilder().build();
+
         @PluginBuilderAttribute
-        @Required(message = "No serverUris provided for ElasticsearchBulkProcessor")
+        @Required(message = "No serverUris provided for " + PLUGIN_NAME)
         private String serverUris;
 
         @PluginElement("auth")
         private Auth auth;
 
+        @PluginElement(ClientSettings.ELEMENT_TYPE)
+        private ClientSettings clientSettings = DEFAULT_CLIENT_SETTINGS;
+
         @Override
         public BulkProcessorObjectFactory build() {
             if (serverUris == null) {
-                throw new ConfigurationException("No serverUris provided for ElasticsearchBulkProcessor");
+                throw new ConfigurationException("No serverUris provided for " + PLUGIN_NAME);
             }
-            return new BulkProcessorObjectFactory(Arrays.asList(serverUris.split(";")), auth);
+            return new BulkProcessorObjectFactory(Arrays.asList(serverUris.split(";")), auth, clientSettings);
         }
 
         public Builder withServerUris(String serverUris) {
@@ -176,17 +184,38 @@ public class BulkProcessorObjectFactory implements ClientObjectFactory<Transport
             this.auth = auth;
             return this;
         }
+
+        public Builder withClientSettings(ClientSettings clientSettings) {
+            this.clientSettings = clientSettings;
+            return this;
+        }
+
     }
 
-    static class InsecureTransportClientProvider implements ClientProvider {
+    static class InsecureTransportClientProvider implements ClientProvider<TransportClient> {
+
+        private final ClientSettings clientSettings;
+
+        InsecureTransportClientProvider() {
+            this.clientSettings = Builder.DEFAULT_CLIENT_SETTINGS;
+        }
+
+        InsecureTransportClientProvider(ClientSettings clientSettings) {
+            this.clientSettings = clientSettings;
+        }
 
         @Override
         public TransportClient createClient() {
+
+            Settings.Builder settingsBuilder = Settings.builder();
+            this.clientSettings.applyTo(settingsBuilder);
+
             return TransportClient
                     .builder()
-                    .settings(Settings.builder().EMPTY_SETTINGS)
+                    .settings(settingsBuilder.build())
                     .build();
         }
 
     }
+
 }

@@ -21,7 +21,6 @@ package org.appenders.log4j2.elasticsearch;
  */
 
 
-import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.ConfigurationException;
 import org.apache.logging.log4j.core.config.Node;
 import org.apache.logging.log4j.core.config.plugins.Plugin;
@@ -29,11 +28,11 @@ import org.apache.logging.log4j.core.config.plugins.PluginBuilderAttribute;
 import org.apache.logging.log4j.core.config.plugins.PluginBuilderFactory;
 import org.apache.logging.log4j.core.config.plugins.PluginElement;
 import org.apache.logging.log4j.core.config.plugins.validation.constraints.Required;
-import org.apache.logging.log4j.status.StatusLogger;
-import org.appenders.log4j2.elasticsearch.failover.FailedItemSource;
 import org.appenders.log4j2.elasticsearch.failover.FailoverListener;
 import org.appenders.log4j2.elasticsearch.failover.RetryListener;
 import org.appenders.log4j2.elasticsearch.spi.BatchEmitterServiceProvider;
+
+import static org.appenders.core.logging.InternalLogging.getLogger;
 
 /**
  * Uses {@link BatchEmitterFactory} SPI to get a {@link BatchEmitter} instance that will hold given items until interval
@@ -41,8 +40,6 @@ import org.appenders.log4j2.elasticsearch.spi.BatchEmitterServiceProvider;
  */
 @Plugin(name = "AsyncBatchDelivery", category = Node.CATEGORY, elementType = BatchDelivery.ELEMENT_TYPE, printObject = true)
 public class AsyncBatchDelivery implements BatchDelivery<String> {
-
-    private static final Logger LOG = StatusLogger.getLogger();
 
     private volatile State state = State.STOPPED;
 
@@ -55,23 +52,8 @@ public class AsyncBatchDelivery implements BatchDelivery<String> {
     private final long delayShutdownInMillis;
 
     /**
-     * @deprecated As of 1.5, this constructor will be removed. Use {@link Builder} instead.
+     * @param builder {@link Builder} instance
      */
-    @Deprecated
-    public AsyncBatchDelivery(int batchSize, int deliveryInterval, ClientObjectFactory objectFactory, FailoverPolicy failoverPolicy, IndexTemplate indexTemplate) {
-        this.batchOperations = objectFactory.createBatchOperations();
-        this.batchEmitter = createBatchEmitterServiceProvider()
-                .createInstance(
-                        batchSize,
-                        deliveryInterval,
-                        objectFactory,
-                        failoverPolicy);
-        this.indexTemplate = indexTemplate;
-        this.objectFactory = objectFactory;
-        this.failoverPolicy = failoverPolicy;
-        this.delayShutdownInMillis = Builder.DEFAULT_SHUTDOWN_DELAY;
-    }
-
     protected AsyncBatchDelivery(Builder builder) {
         this.batchOperations = builder.clientObjectFactory.createBatchOperations();
         this.batchEmitter = createBatchEmitterServiceProvider()
@@ -141,7 +123,7 @@ public class AsyncBatchDelivery implements BatchDelivery<String> {
         public static final long DEFAULT_SHUTDOWN_DELAY = 5000L;
 
         @PluginElement("elasticsearchClientFactory")
-        @Required(message = "No Elasticsearch client factory [JestHttp|ElasticsearchBulkProcessor] provided for AsyncBatchDelivery")
+        @Required(message = "No Elasticsearch client factory [HCHttp|JestHttp|ElasticsearchBulkProcessor] provided for AsyncBatchDelivery")
         private ClientObjectFactory clientObjectFactory;
 
         @PluginBuilderAttribute
@@ -162,7 +144,7 @@ public class AsyncBatchDelivery implements BatchDelivery<String> {
         @Override
         public AsyncBatchDelivery build() {
             if (clientObjectFactory == null) {
-                throw new ConfigurationException("No Elasticsearch client factory [JestHttp|ElasticsearchBulkProcessor] provided for AsyncBatchDelivery");
+                throw new ConfigurationException("No Elasticsearch client factory [HCHttp|JestHttp|ElasticsearchBulkProcessor] provided for AsyncBatchDelivery");
             }
             return new AsyncBatchDelivery(this);
         }
@@ -227,7 +209,7 @@ public class AsyncBatchDelivery implements BatchDelivery<String> {
     @Override
     public void stop() {
 
-        LOG.debug("Stopping {}", getClass().getSimpleName());
+        getLogger().debug("Stopping {}", getClass().getSimpleName());
 
         if (!LifeCycle.of(failoverPolicy).isStopped()) {
             // Shutdown MUST happen in background to allow the execution to continue
@@ -246,7 +228,7 @@ public class AsyncBatchDelivery implements BatchDelivery<String> {
 
         state = State.STOPPED;
 
-        LOG.debug("{} stopped", getClass().getSimpleName());
+        getLogger().debug("{} stopped", getClass().getSimpleName());
 
     }
 

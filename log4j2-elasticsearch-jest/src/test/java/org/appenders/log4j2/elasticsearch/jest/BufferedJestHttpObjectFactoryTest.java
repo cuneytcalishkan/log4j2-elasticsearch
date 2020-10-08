@@ -23,6 +23,7 @@ package org.appenders.log4j2.elasticsearch.jest;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 import io.searchbox.action.AbstractAction;
 import io.searchbox.client.JestClient;
 import io.searchbox.client.JestResult;
@@ -32,7 +33,6 @@ import io.searchbox.core.BulkResult;
 import org.apache.logging.log4j.core.config.ConfigurationException;
 import org.appenders.log4j2.elasticsearch.Auth;
 import org.appenders.log4j2.elasticsearch.BatchOperations;
-import org.appenders.log4j2.elasticsearch.ByteBufItemSource;
 import org.appenders.log4j2.elasticsearch.ClientObjectFactory;
 import org.appenders.log4j2.elasticsearch.ClientProvider;
 import org.appenders.log4j2.elasticsearch.FailoverPolicy;
@@ -53,20 +53,20 @@ import org.powermock.api.mockito.PowerMockito;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.UUID;
 import java.util.function.Function;
 
-import static org.appenders.log4j2.elasticsearch.GenericItemSourcePoolTest.byteBufAllocator;
+import static org.appenders.log4j2.elasticsearch.ByteBufItemSourceTest.createDefaultTestByteBuf;
+import static org.appenders.log4j2.elasticsearch.ByteBufItemSourceTest.createTestItemSource;
 import static org.appenders.log4j2.elasticsearch.mock.LifecycleTestHelper.falseOnlyOnce;
 import static org.appenders.log4j2.elasticsearch.mock.LifecycleTestHelper.trueOnlyOnce;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.never;
@@ -400,32 +400,6 @@ public class BufferedJestHttpObjectFactoryTest {
     }
 
     @Test
-    public void deprecatedConstructorSetsDefaultIoThreadCount() throws IllegalAccessException {
-
-        // given
-        PooledItemSourceFactory bufferedSourceFactory = PooledItemSourceFactoryTest
-                .createDefaultTestSourceFactoryConfig()
-                .build();
-
-        // when
-        BufferedJestHttpObjectFactory factory = new BufferedJestHttpObjectFactory(
-                Arrays.asList(TEST_SERVER_URIS.split(";")),
-                TEST_CONNECTION_TIMEOUT,
-                TEST_READ_TIMEOUT,
-                TEST_MAX_TOTAL_CONNECTIONS,
-                TEST_DEFAULT_MAX_TOTAL_CONNECTIONS_PER_ROUTE,
-                TEST_DISCOVERY_ENABLED,
-                bufferedSourceFactory,
-                null
-        );
-
-        // then
-        assertEquals(Runtime.getRuntime().availableProcessors(),
-                PowerMockito.field(factory.getClass(), "ioThreadCount").get(factory));
-
-    }
-
-    @Test
     public void responseHandlerDeregistersRequestFromBackoffPolicyAfterException() {
 
         // given
@@ -482,11 +456,9 @@ public class BufferedJestHttpObjectFactoryTest {
     }
 
     private ItemSource<ByteBuf> createDefaultTestBuffereItemSource(String payload) {
-        ByteBuf buffer = byteBufAllocator.buffer(16);
+        CompositeByteBuf buffer = createDefaultTestByteBuf();
         buffer.writeBytes(payload.getBytes());
-        return new ByteBufItemSource(buffer, source -> {
-            // noop
-        });
+        return createTestItemSource(buffer, source -> {});
     }
 
     @Test
@@ -626,7 +598,7 @@ public class BufferedJestHttpObjectFactoryTest {
 
     private Bulk createTestBatch(ItemSource<ByteBuf>... payloads) {
         BufferedBulk.Builder builder = spy(new BufferedBulk.Builder());
-        builder.withBuffer(new ByteBufItemSource(byteBufAllocator.buffer(32), source -> {}));
+        builder.withBuffer(createTestItemSource(createDefaultTestByteBuf(), source -> {}));
         builder.withObjectWriter(mock(ObjectWriter.class));
         builder.withObjectReader(mock(ObjectReader.class));
 

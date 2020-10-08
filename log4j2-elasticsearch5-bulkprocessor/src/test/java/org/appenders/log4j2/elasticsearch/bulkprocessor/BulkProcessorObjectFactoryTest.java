@@ -49,12 +49,13 @@ import org.mockito.stubbing.Answer;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.function.Function;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -70,8 +71,9 @@ public class BulkProcessorObjectFactoryTest {
 
 
     public static Builder createTestObjectFactoryBuilder() {
-        Builder builder = BulkProcessorObjectFactory.newBuilder();
-        builder.withServerUris(TEST_SERVER_URIS);
+        Builder builder = BulkProcessorObjectFactory.newBuilder()
+                .withServerUris(TEST_SERVER_URIS)
+                .withClientSettings(ClientSettings.newBuilder().build());
         return builder;
     }
 
@@ -168,6 +170,20 @@ public class BulkProcessorObjectFactoryTest {
         builder.withAuth(null);
 
         BulkProcessorObjectFactory factory = builder.build();
+
+        // when
+        ClientProvider clientProvider = factory.getClientProvider();
+
+        // then
+        Assert.assertTrue(clientProvider instanceof BulkProcessorObjectFactory.InsecureTransportClientProvider);
+
+    }
+
+    @Test
+    public void insecureTransportCanBeSetUpWithMinimalConstructor() {
+
+        // given
+        BulkProcessorObjectFactory factory = new BulkProcessorObjectFactory(Collections.singletonList(TEST_SERVER_URIS), null);
 
         // when
         ClientProvider clientProvider = factory.getClientProvider();

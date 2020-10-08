@@ -43,6 +43,7 @@ import java.util.function.Supplier;
 
 import static java.lang.Thread.interrupted;
 import static java.lang.Thread.sleep;
+import static org.appenders.core.util.PropertiesUtil.getInt;
 
 public abstract class SmokeTestBase {
 
@@ -53,13 +54,12 @@ public abstract class SmokeTestBase {
     private final AtomicInteger localCounter = new AtomicInteger();
 
     // TODO: expose all via system properties
-    public static final int LIMIT_PER_SEC = 5000;
     public static final int INITIAL_SLEEP_PER_THREAD = 10;
     public static final int MILLIS_BEFORE_SHUTDOWN = 60000;
     public static final int MILLIS_AFTER_SHUTDOWN = 60000;
     public static final int NUMBER_OF_PRODUCERS = 100;
     public static final int LOG_SIZE = 300;
-    private boolean secure = false;
+    protected boolean secure = false;
     private final AtomicInteger numberOfLogs = new AtomicInteger(1000000);
 
     public abstract ElasticsearchAppender.Builder createElasticsearchAppenderBuilder(boolean messageOnly, boolean buffered, boolean secured);
@@ -75,13 +75,13 @@ public abstract class SmokeTestBase {
         return new String(bytes);
     }
 
-    public final void createLoggerProgrammatically(ElasticsearchAppender.Builder appenderBuilder, Function<Configuration, AsyncLoggerConfigDelegate> delegateSupplier) {
+    public final void createLoggerProgrammatically(Supplier<ElasticsearchAppender.Builder> appenderBuilder, Function<Configuration, AsyncLoggerConfigDelegate> delegateSupplier) {
 
         LoggerContext ctx = LoggerContext.getContext(false);
 
         final Configuration config = ctx.getConfiguration();
 
-        Appender appender = appenderBuilder.build();
+        Appender appender = appenderBuilder.get().build();
         appender.start();
 
         AppenderRef ref = AppenderRef.createAppenderRef(DEFAULT_APPENDER_NAME, Level.INFO, null);
@@ -110,7 +110,7 @@ public abstract class SmokeTestBase {
         System.setProperty("Log4jContextSelector", "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector");
 
         createLoggerProgrammatically(
-                createElasticsearchAppenderBuilder(false, false, secure),
+                () -> createElasticsearchAppenderBuilder(false, false, secure),
                 createAsyncLoggerConfigDelegateProvider());
 
         String loggerThatReferencesElasticsearchAppender = "elasticsearch";
@@ -133,7 +133,7 @@ public abstract class SmokeTestBase {
         System.setProperty("AsyncLogger.WaitStrategy", "sleep");
 
         createLoggerProgrammatically(
-                createElasticsearchAppenderBuilder(false, false, secure),
+                () -> createElasticsearchAppenderBuilder(false, false, secure),
                 createAsyncLoggerConfigDelegateProvider());
 
         final String log = createLog();
@@ -158,7 +158,7 @@ public abstract class SmokeTestBase {
         System.setProperty("AsyncLoggerConfig.WaitStrategy", "sleep");
 
         createLoggerProgrammatically(
-                createElasticsearchAppenderBuilder(false, true, secure),
+                () -> createElasticsearchAppenderBuilder(false, true, secure),
                 createAsyncLoggerConfigDelegateProvider());
 
         Logger logger = LogManager.getLogger(DEFAULT_LOGGER_NAME);
@@ -207,7 +207,7 @@ public abstract class SmokeTestBase {
     @Test
     public void propertiesConfigTest() throws InterruptedException {
 
-        System.setProperty("log4j.configurationFile", "log4j2-buffered-example.properties");
+        System.setProperty("log4j.configurationFile", "log4j2.properties");
         AtomicInteger counter = new AtomicInteger();
 
         Logger logger = LogManager.getLogger("elasticsearch");
@@ -238,10 +238,11 @@ public abstract class SmokeTestBase {
             }).start();
         }
 
+        final int limitPerSec = getInt("smokeTest.limitPerSec", 10000);
         while (latch.getCount() != 0) {
             sleep(1000);
             int count = localCounter.getAndSet(0);
-            if (count > LIMIT_PER_SEC && sleepTime.get() != 1) {
+            if (count > limitPerSec && sleepTime.get() != 1) {
                 sleepTime.incrementAndGet();
             } else if (sleepTime.get() > 1) {
                 sleepTime.decrementAndGet();

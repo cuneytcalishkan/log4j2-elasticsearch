@@ -36,10 +36,11 @@ import java.io.Serializable;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.appenders.log4j2.elasticsearch.StringItemSourceTest.createTestStringItemSource;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -159,7 +160,7 @@ public class ItemAppenderFactoryTest {
         ItemSourceAppender itemAppender = factory.createInstance(false, itemSourceLayout, batchDelivery);
 
         String expectedMessage = UUID.randomUUID().toString();
-        ItemSource itemSource = new StringItemSource(expectedMessage);
+        ItemSource itemSource = createTestStringItemSource(expectedMessage);
         when(itemSourceLayout.serialize(any(LogEvent.class))).thenReturn(itemSource);
 
         LogEvent logEvent = createDefaultTestLogEvent();
@@ -191,7 +192,7 @@ public class ItemAppenderFactoryTest {
                 factory.createInstance(true, itemSourceLayout, batchDelivery);
 
         String expectedMessage = UUID.randomUUID().toString();
-        ItemSource itemSource = new StringItemSource(expectedMessage);
+        ItemSource itemSource = createTestStringItemSource(expectedMessage);
         when(itemSourceLayout.serialize(any(Message.class))).thenReturn(itemSource);
 
         LogEvent logEvent = mock(LogEvent.class);

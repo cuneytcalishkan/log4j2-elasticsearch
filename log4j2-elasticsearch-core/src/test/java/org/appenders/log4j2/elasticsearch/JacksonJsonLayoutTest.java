@@ -20,6 +20,7 @@ package org.appenders.log4j2.elasticsearch;
  * #L%
  */
 
+import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -50,9 +51,9 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -251,6 +252,33 @@ public class JacksonJsonLayoutTest {
     }
 
     @Test
+    public void builderDoesNotUseFiltersWhileResolvingNonDynamicVirtualProperties() {
+
+        // given
+        VirtualPropertyFilter filter = mock(VirtualPropertyFilter.class);
+
+        JacksonJsonLayout.Builder builder = spy(createDefaultTestBuilder()
+                .withVirtualPropertyFilters(new VirtualPropertyFilter[] { filter }));
+
+        ValueResolver valueResolver = mock(ValueResolver.class);
+        when(builder.createValueResolver()).thenReturn(valueResolver);
+
+        VirtualProperty virtualProperty = new VirtualProperty.Builder()
+                .withDynamic(false)
+                .withName(UUID.randomUUID().toString())
+                .withValue(UUID.randomUUID().toString())
+                .build();
+
+        builder.withVirtualProperties(virtualProperty);
+
+        // when
+        builder.build();
+
+        // then
+        verify(filter, never()).isIncluded(any(), any());
+    }
+
+    @Test
     public void builderDoesNotResolveDynamicVirtualProperties() {
 
         // given
@@ -314,6 +342,39 @@ public class JacksonJsonLayoutTest {
 
         // then
         assertTrue(result instanceof Log4j2Lookup);
+
+    }
+
+    @Test
+    public void createsSingleThreadJsonFactoryIfConfigured() {
+
+        // given
+        JacksonJsonLayout.Builder builder = spy(createDefaultTestBuilder());
+        builder.withSingleThread(true);
+
+        // when
+        ObjectMapper defaultObjectMapper = builder.createDefaultObjectMapper();
+
+        // then
+        verify(builder).createJsonFactory();
+        assertTrue(defaultObjectMapper.getFactory() instanceof SingleThreadJsonFactory);
+
+    }
+
+
+    @Test
+    public void createsJsonFactoryByDefault() {
+
+        // given
+        JacksonJsonLayout.Builder builder = spy(createDefaultTestBuilder());
+        builder.withSingleThread(false);
+
+        // when
+        ObjectMapper defaultObjectMapper = builder.createDefaultObjectMapper();
+
+        // then
+        verify(builder).createJsonFactory();
+        assertEquals(defaultObjectMapper.getFactory().getClass(), JsonFactory.class);
 
     }
 

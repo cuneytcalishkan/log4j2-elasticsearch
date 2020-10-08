@@ -33,6 +33,8 @@ import org.apache.logging.log4j.core.impl.DefaultLogEventFactory;
 import org.apache.logging.log4j.core.layout.AbstractLayout;
 import org.apache.logging.log4j.core.layout.JsonLayout;
 import org.apache.logging.log4j.message.SimpleMessage;
+import org.appenders.core.logging.InternalLogging;
+import org.appenders.core.logging.Logger;
 import org.appenders.log4j2.elasticsearch.ElasticsearchAppender.Builder;
 import org.appenders.log4j2.elasticsearch.mock.LifecycleTestHelper;
 import org.junit.Rule;
@@ -47,11 +49,13 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.verify;
@@ -355,6 +359,27 @@ public class ElasticsearchAppenderTest {
         assertTrue(mockingDetails(abstractLayout).getInvocations().size() == 0);
         assertFalse(appender.isStarted());
         assertTrue(appender.isStopped());
+
+    }
+
+    @Test
+    public void lifecycleStopResetsInternalLogging() {
+
+        // given
+        Logger initialLogger = InternalLogging.getLogger();
+        assertNotNull(initialLogger);
+
+        LifeCycle lifeCycle = createLifeCycleTestObject();
+
+        lifeCycle.start();
+
+        assertSame(initialLogger, InternalLogging.getLogger());
+
+        // when
+        lifeCycle.stop();
+
+        // then
+        assertNotSame(initialLogger, InternalLogging.getLogger());
 
     }
 

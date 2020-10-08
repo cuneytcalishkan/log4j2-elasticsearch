@@ -47,7 +47,6 @@ import org.mockito.Mockito;
 import org.powermock.api.mockito.PowerMockito;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -177,24 +176,6 @@ public class JestHttpObjectFactoryTest {
         assertEquals(TEST_DISCOVERY_ENABLED,
                 PowerMockito.field(httpObjectFactory.getClass(), "discoveryEnabled").get(httpObjectFactory));
         assertEquals(TEST_IO_THREAD_COUNT,
-                PowerMockito.field(httpObjectFactory.getClass(), "ioThreadCount").get(httpObjectFactory));
-
-    }
-
-    @Test
-    public void deprecatedConstructorInitializesIoThreadCount() throws IllegalAccessException {
-
-        // when
-        JestHttpObjectFactory httpObjectFactory = new JestHttpObjectFactory(Arrays.asList(TEST_SERVER_URIS.split(";")),
-                TEST_CONNECTION_TIMEOUT,
-                TEST_READ_TIMEOUT,
-                TEST_MAX_TOTAL_CONNECTIONS,
-                TEST_DEFAULT_MAX_TOTAL_CONNECTIONS_PER_ROUTE,
-                TEST_DISCOVERY_ENABLED,
-                null);
-
-        // then
-        assertEquals(Runtime.getRuntime().availableProcessors() ,
                 PowerMockito.field(httpObjectFactory.getClass(), "ioThreadCount").get(httpObjectFactory));
 
     }

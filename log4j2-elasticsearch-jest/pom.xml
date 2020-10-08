@@ -3,7 +3,7 @@
     <parent>
         <artifactId>parent</artifactId>
         <groupId>org.appenders.log4j</groupId>
-        <version>1.4.1-SNAPSHOT</version>
+        <version>1.5.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <artifactId>log4j2-elasticsearch-jest</artifactId>
@@ -108,7 +108,6 @@
         <dependency>
             <groupId>net.openhft</groupId>
             <artifactId>chronicle-map</artifactId>
-            <version>3.17.0</version>
             <scope>provided</scope>
         </dependency>
 
@@ -133,12 +132,6 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.hamcrest</groupId>
-            <artifactId>hamcrest-core</artifactId>
-            <version>1.3</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.powermock</groupId>
             <artifactId>powermock-api-mockito2</artifactId>
             <version>2.0.0-beta.5</version>
@@ -153,6 +146,12 @@
     </dependencies>
 
     <build>
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+                <filtering>false</filtering>
+            </testResource>
+        </testResources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -169,6 +168,11 @@
                         <jksCertInfo.keystorePassword>password</jksCertInfo.keystorePassword>
                         <jksCertInfo.truststorePath>${project.build.testOutputDirectory}/jks/truststore.jks</jksCertInfo.truststorePath>
                         <jksCertInfo.truststorePassword>password</jksCertInfo.truststorePassword>
+                        <smokeTest.batchSize>10000</smokeTest.batchSize>
+                        <smokeTest.initialBatchPoolSize>4</smokeTest.initialBatchPoolSize>
+                        <smokeTest.initialItemPoolSize>40000</smokeTest.initialItemPoolSize>
+                        <smokeTest.initialItemBufferSizeInBytes>1024</smokeTest.initialItemBufferSizeInBytes>
+                        <smokeTest.limitPerSec>10000</smokeTest.limitPerSec>
                         <buildDirectory>${project.build.directory}</buildDirectory>
                     </systemPropertyVariables>
                 </configuration>
